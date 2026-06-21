@@ -67,9 +67,11 @@ export default function ReviewQueue() {
     if (!selectedContent) return;
     setSubmitting(true);
     try {
-      reviewType === 'approve'
-        ? await approveContent(selectedContent.id, opinion)
-        : await rejectContent(selectedContent.id, opinion);
+      if (reviewType === 'approve') {
+        await approveContent(selectedContent.id, opinion);
+      } else {
+        await rejectContent(selectedContent.id, opinion);
+      }
       setShowReviewModal(false);
       alert(`已${reviewType === 'approve' ? '通过' : '驳回'}：${selectedContent.title}`);
       loadQueue();

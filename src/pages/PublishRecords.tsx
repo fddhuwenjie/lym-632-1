@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Download, Filter, FileText, CheckCircle, XCircle, Clock, ChevronDown, AlertTriangle, Activity, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { getPublishRecords, getFailureReviews, resolveFailureReview } from '../api/publish';
@@ -43,7 +43,7 @@ export default function PublishRecords() {
   const [reviewActionType, setReviewActionType] = useState<'republish' | 'manual_publish'>('republish');
   const [submitting, setSubmitting] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const params: { [key: string]: string | number | boolean | undefined } = { page: 1, pageSize: 50 };
@@ -58,7 +58,7 @@ export default function PublishRecords() {
         getFailureReviews({ page: 1, pageSize: 100 }),
       ]);
       setRecords(recordsResult.items);
-      setChannels(channelsResult.items || channelsResult.items || []);
+      setChannels(channelsResult.items || []);
       const hMap: Record<number, ChannelHealth> = {};
       healthList.forEach(h => { hMap[h.channel_id] = h; });
       setChannelHealthData(hMap);
@@ -68,12 +68,11 @@ export default function PublishRecords() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, channelFilter, startDate, endDate]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadData();
-  }, [statusFilter, channelFilter, startDate, endDate]);
+  }, [loadData]);
 
   const handleExport = async () => {
     try {
