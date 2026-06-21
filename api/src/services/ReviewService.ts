@@ -7,7 +7,6 @@ import { validateReviewOpinion } from '../utils/validator.js'
 import type {
   ReviewRecord,
   ReviewAuditTrail,
-  ReviewAuditAction,
   Content,
   PaginationParams,
   PaginationResult,

@@ -1,5 +1,21 @@
 import db, { transaction } from '../db/index.js'
-import type { ChannelHealth, RateLimitStatus, PaginationParams, PaginationResult } from '../../../shared/types.js'
+import type { ChannelHealth, RateLimitStatus, PaginationParams, PaginationResult, Channel } from '../../../shared/types.js'
+
+interface ChannelHealthRow {
+  id: number
+  channel_id: number
+  success_rate: number
+  last_failure_reason: string | null
+  rate_limit_status: RateLimitStatus
+  responsible_person: string | null
+  updated_at: string
+  c_id?: number | null
+  c_name?: string | null
+  c_type?: string | null
+  c_status?: string | null
+  c_config?: string | null
+  channel?: Channel
+}
 
 export interface CreateChannelHealthParams {
   channel_id: number
@@ -25,11 +41,18 @@ const CHANNEL_JOIN = `
   LEFT JOIN channels c ON ch.channel_id = c.id
 `
 
-function mapRow(row: any): ChannelHealth {
-  if (!row) return row
-  const { c_id, c_name, c_type, c_status, c_config, ...health } = row
+function mapRow(row: unknown): ChannelHealth {
+  if (!row) return row as ChannelHealth
+  const r = row as ChannelHealthRow
+  const { c_id, c_name, c_type, c_status, c_config, ...health } = r
   if (c_id !== null && c_id !== undefined) {
-    health.channel = { id: c_id, name: c_name, type: c_type, status: c_status, config: c_config }
+    health.channel = {
+      id: c_id,
+      name: c_name ?? '',
+      type: c_type ?? '',
+      status: (c_status ?? 'active') as 'active' | 'inactive',
+      config: c_config ?? null,
+    }
   }
   return health as ChannelHealth
 }
@@ -95,7 +118,7 @@ export async function findAll(params?: PaginationParams): Promise<PaginationResu
     ORDER BY ch.id ASC
     LIMIT ? OFFSET ?
   `)
-  const rows = stmt.all(pageSize, offset) as any[]
+  const rows = stmt.all(pageSize, offset) as ChannelHealthRow[]
   const items = rows.map(mapRow)
 
   return { items, total, page, pageSize }

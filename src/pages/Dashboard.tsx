@@ -1,31 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Clock, Calendar, AlertTriangle, TrendingUp, FileText, ChevronRight, Eye, Check, X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { getDashboardStats, getDashboardPending, getDashboardRecentSchedules } from '../api/dashboard';
 import type { DashboardStats, Content, Schedule, ContentType } from '../../shared/types';
-
-const mockStats: DashboardStats = {
-  pending_review_count: 12,
-  today_schedule_count: 8,
-  sensitive_hit_count: 24,
-  publish_success_rate: 92.5,
-  high_risk_channel_count: 1,
-  pending_failure_review_count: 2,
-};
-
-const mockPending: Content[] = [
-  { id: 1, title: '2024年度产品发布会预告', type: 'article', status: 'pending_review', created_at: '2024-01-15 10:30', creator_id: 1, content: '', scan_version: 1, updated_at: '' },
-  { id: 2, title: '新品上市短视频宣传', type: 'video', status: 'pending_review', created_at: '2024-01-15 09:15', creator_id: 1, content: '', scan_version: 1, updated_at: '' },
-  { id: 3, title: '春节活动海报设计', type: 'poster', status: 'pending_review', created_at: '2024-01-14 16:45', creator_id: 1, content: '', scan_version: 1, updated_at: '' },
-  { id: 4, title: '客户案例分享文章', type: 'article', status: 'pending_review', created_at: '2024-01-14 14:20', creator_id: 1, content: '', scan_version: 1, updated_at: '' },
-  { id: 5, title: '品牌日活动宣传视频', type: 'video', status: 'pending_review', created_at: '2024-01-14 11:00', creator_id: 1, content: '', scan_version: 1, updated_at: '' },
-];
-
-const mockSchedules: Schedule[] = [
-  { id: 1, content_id: 1, channel_id: 1, schedule_time: '2024-01-15 14:00', status: 'scheduled', created_at: '', updated_at: '', content: { id: 1, title: '年度总结报告', type: 'article' } as Content },
-  { id: 2, content_id: 2, channel_id: 2, schedule_time: '2024-01-15 15:30', status: 'scheduled', created_at: '', updated_at: '', content: { id: 2, title: '新品介绍视频', type: 'video' } as Content },
-  { id: 3, content_id: 3, channel_id: 3, schedule_time: '2024-01-15 18:00', status: 'scheduled', created_at: '', updated_at: '', content: { id: 3, title: '促销活动海报', type: 'poster' } as Content },
-  { id: 4, content_id: 4, channel_id: 4, schedule_time: '2024-01-15 20:00', status: 'scheduled', created_at: '', updated_at: '', content: { id: 4, title: '用户故事分享', type: 'article' } as Content },
-];
 
 const typeLabels: Record<ContentType, string> = {
   article: '文章',
@@ -40,26 +17,38 @@ const typeColors: Record<ContentType, string> = {
 };
 
 export default function Dashboard() {
-  const [stats] = useState<DashboardStats>(mockStats);
-  const [pending] = useState<Content[]>(mockPending);
-  const [schedules] = useState<Schedule[]>(mockSchedules);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [pending, setPending] = useState<Content[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
+    (async () => {
+      try {
+        const [s, p, sch] = await Promise.all([
+          getDashboardStats(),
+          getDashboardPending(),
+          getDashboardRecentSchedules(),
+        ]);
+        setStats(s);
+        setPending(p);
+        setSchedules(sch);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const statCards = [
+  const statCards = stats ? [
     { title: '待复核数量', value: stats.pending_review_count, icon: Clock, color: 'from-orange-400 to-orange-600', suffix: '条' },
     { title: '今日排期', value: stats.today_schedule_count, icon: Calendar, color: 'from-blue-400 to-blue-600', suffix: '条' },
     { title: '敏感词命中', value: stats.sensitive_hit_count, icon: AlertTriangle, color: 'from-red-400 to-red-600', suffix: '次' },
     { title: '发布成功率', value: stats.publish_success_rate, icon: TrendingUp, color: 'from-green-400 to-green-600', suffix: '%' },
     { title: '高风险渠道', value: stats.high_risk_channel_count, icon: AlertTriangle, color: 'from-red-500 to-red-700', suffix: '个' },
     { title: '待复盘', value: stats.pending_failure_review_count, icon: Clock, color: 'from-yellow-500 to-yellow-700', suffix: '条' },
-  ];
+  ] : [];
 
   if (loading) {
     return (
@@ -142,6 +131,9 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+              {pending.length === 0 && (
+                <div className="text-center text-gray-400 py-8 text-sm">暂无待复核内容</div>
+              )}
             </div>
           </div>
 
@@ -170,7 +162,7 @@ export default function Dashboard() {
                       <FileText className="w-5 h-5 text-[#1e3a5f]" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-gray-900 font-medium truncate">{item.content?.title}</p>
+                      <p className="text-gray-900 font-medium truncate">{item.content?.title || `内容#${item.content_id}`}</p>
                       <p className="text-gray-400 text-xs">{item.schedule_time}</p>
                     </div>
                   </div>
@@ -179,6 +171,9 @@ export default function Dashboard() {
                   </span>
                 </div>
               ))}
+              {schedules.length === 0 && (
+                <div className="text-center text-gray-400 py-8 text-sm">暂无排期</div>
+              )}
             </div>
           </div>
         </div>

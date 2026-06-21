@@ -11,7 +11,6 @@ import type {
   Content,
   ReviewRecord,
   ReviewRequest,
-  ReviewAuditTrail,
   PaginationParams,
   PaginationResult,
   ApiResponse,

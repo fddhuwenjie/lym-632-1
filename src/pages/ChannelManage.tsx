@@ -1,23 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Eye, X, CheckCircle, XCircle, Calendar, Activity, AlertTriangle, Shield, User, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
+import {
+  getChannelStatus,
+  addChannel,
+  updateChannel,
+  deleteChannel as deleteChannelApi,
+  getChannelHealthList,
+  updateChannelHealth,
+  refreshChannelHealth as refreshChannelHealthApi,
+} from '../api/channel';
 import type { Channel, ChannelHealth } from '../../shared/types';
-
-const mockChannels: (Channel & { today_count: number })[] = [
-  { id: 1, name: '微信公众号', type: 'wechat', status: 'active', today_count: 3 },
-  { id: 2, name: '微博', type: 'weibo', status: 'active', today_count: 2 },
-  { id: 3, name: '抖音', type: 'douyin', status: 'active', today_count: 2 },
-  { id: 4, name: '小红书', type: 'xiaohongshu', status: 'active', today_count: 1 },
-  { id: 5, name: 'B站', type: 'bilibili', status: 'inactive', today_count: 0 },
-];
-
-const mockChannelHealth: Record<number, ChannelHealth> = {
-  1: { id: 1, channel_id: 1, success_rate: 0.95, last_failure_reason: null, rate_limit_status: 'normal', responsible_person: '张三', updated_at: '2024-01-15' },
-  2: { id: 2, channel_id: 2, success_rate: 0.72, last_failure_reason: '接口超时', rate_limit_status: 'limited', responsible_person: '李四', updated_at: '2024-01-15' },
-  3: { id: 3, channel_id: 3, success_rate: 0.35, last_failure_reason: 'API密钥过期', rate_limit_status: 'blocked', responsible_person: '王五', updated_at: '2024-01-15' },
-  4: { id: 4, channel_id: 4, success_rate: 0.88, last_failure_reason: null, rate_limit_status: 'normal', responsible_person: '赵六', updated_at: '2024-01-15' },
-  5: { id: 5, channel_id: 5, success_rate: 0.50, last_failure_reason: '渠道已停用', rate_limit_status: 'normal', responsible_person: null, updated_at: '2024-01-15' },
-};
 
 const channelTypes = [
   { value: 'wechat', label: '微信公众号', color: 'bg-green-500' },
@@ -33,8 +26,9 @@ const getChannelTypeInfo = (type: string) => {
 };
 
 export default function ChannelManage() {
-  const [channels, setChannels] = useState(mockChannels);
-  const [channelHealthData, setChannelHealthData] = useState(mockChannelHealth);
+  const [channels, setChannels] = useState<(Channel & { today_schedule_count: number })[]>([]);
+  const [channelHealthData, setChannelHealthData] = useState<Record<number, ChannelHealth>>({});
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
@@ -47,6 +41,29 @@ export default function ChannelManage() {
   const [type, setType] = useState('wechat');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [config, setConfig] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [statusData, healthList] = await Promise.all([
+        getChannelStatus(),
+        getChannelHealthList(),
+      ]);
+      setChannels(statusData.channels);
+      const healthMap: Record<number, ChannelHealth> = {};
+      healthList.forEach(h => { healthMap[h.channel_id] = h; });
+      setChannelHealthData(healthMap);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleOpenModal = (channel?: Channel) => {
     if (channel) {
@@ -70,36 +87,83 @@ export default function ChannelManage() {
     setShowDetailModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       alert('请输入渠道名称');
       return;
     }
-    if (editingChannel) {
-      setChannels(channels.map(c => c.id === editingChannel.id ? { ...c, name, type, status, config } as Channel & { today_count: number } : c));
-    } else {
-      const newChannel: Channel & { today_count: number } = {
-        id: Math.max(...channels.map(c => c.id)) + 1,
-        name,
-        type,
-        status,
-        config,
-        today_count: 0,
-      };
-      setChannels([...channels, newChannel]);
+    setSaving(true);
+    try {
+      if (editingChannel) {
+        const updated = await updateChannel(editingChannel.id, { name, type, status, config });
+        setChannels(channels.map(c => c.id === editingChannel.id ? { ...updated, today_schedule_count: c.today_schedule_count } : c));
+      } else {
+        const created = await addChannel({ name, type, status, config });
+        setChannels([...channels, { ...created, today_schedule_count: 0 }]);
+      }
+      setShowModal(false);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSaving(false);
     }
-    setShowModal(false);
   };
 
-  const handleDelete = (id: number, name: string) => {
-    if (confirm(`确定要删除渠道"${name}"吗？`)) {
+  const handleDelete = async (id: number, nameStr: string) => {
+    if (!confirm(`确定要删除渠道"${nameStr}"吗？`)) return;
+    try {
+      await deleteChannelApi(id);
       setChannels(channels.filter(c => c.id !== id));
+      const next = { ...channelHealthData };
+      delete next[id];
+      setChannelHealthData(next);
+    } catch (e) {
+      alert((e as Error).message);
     }
   };
 
-  const toggleStatus = (id: number) => {
-    setChannels(channels.map(c => c.id === id ? { ...c, status: c.status === 'active' ? 'inactive' : 'active' } : c));
+  const toggleStatus = async (id: number) => {
+    const ch = channels.find(c => c.id === id);
+    if (!ch) return;
+    try {
+      const newStatus = ch.status === 'active' ? 'inactive' : 'active';
+      await updateChannel(id, { status: newStatus });
+      setChannels(channels.map(c => c.id === id ? { ...c, status: newStatus } : c));
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
+
+  const handleSaveResponsible = async () => {
+    if (!healthChannelId) return;
+    const health = channelHealthData[healthChannelId];
+    if (!health) return;
+    try {
+      const updated = await updateChannelHealth(healthChannelId, { responsible_person: responsibleInput || undefined });
+      setChannelHealthData({ ...channelHealthData, [healthChannelId]: updated });
+      setEditingResponsible(false);
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
+  const handleRefreshHealth = async () => {
+    if (!healthChannelId) return;
+    try {
+      const updated = await refreshChannelHealthApi(healthChannelId);
+      setChannelHealthData({ ...channelHealthData, [healthChannelId]: updated });
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-[#1e3a5f]/30 border-t-[#1e3a5f] rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
@@ -153,7 +217,7 @@ export default function ChannelManage() {
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-600">今日排期</span>
                   </div>
-                  <span className="ml-auto text-xl font-bold text-[#1e3a5f]">{channel.today_count}</span>
+                  <span className="ml-auto text-xl font-bold text-[#1e3a5f]">{channel.today_schedule_count}</span>
                 </div>
 
                 {channelHealthData[channel.id] && (() => {
@@ -324,14 +388,14 @@ export default function ChannelManage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={!name.trim()}
+                disabled={!name.trim() || saving}
                 className={cn(
                   'flex-1 py-2.5 px-4 rounded-lg font-medium text-white transition-all',
                   'bg-[#1e3a5f] hover:bg-[#2d4a6f]',
                   'disabled:opacity-50 disabled:cursor-not-allowed'
                 )}
               >
-                {editingChannel ? '保存修改' : '添加'}
+                {saving ? '保存中...' : (editingChannel ? '保存修改' : '添加')}
               </button>
             </div>
           </div>
@@ -371,7 +435,7 @@ export default function ChannelManage() {
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-500 mb-1">今日排期</p>
-                  <p className="text-2xl font-bold text-[#1e3a5f]">{channels.find(c => c.id === selectedChannel.id)?.today_count || 0}</p>
+                  <p className="text-2xl font-bold text-[#1e3a5f]">{channels.find(c => c.id === selectedChannel.id)?.today_schedule_count || 0}</p>
                 </div>
               </div>
 
@@ -465,10 +529,7 @@ export default function ChannelManage() {
                           autoFocus
                         />
                         <button
-                          onClick={() => {
-                            setChannelHealthData({ ...channelHealthData, [healthChannelId]: { ...health, responsible_person: responsibleInput || null } });
-                            setEditingResponsible(false);
-                          }}
+                          onClick={handleSaveResponsible}
                           className="text-xs text-[#1e3a5f] font-medium hover:underline"
                         >
                           保存
@@ -504,12 +565,7 @@ export default function ChannelManage() {
 
               <div className="flex gap-4 mt-8">
                 <button
-                  onClick={() => {
-                    setChannelHealthData({
-                      ...channelHealthData,
-                      [healthChannelId]: { ...health, success_rate: Math.min(1, Math.max(0, health.success_rate + (Math.random() - 0.5) * 0.1)), updated_at: new Date().toISOString().split('T')[0] }
-                    });
-                  }}
+                  onClick={handleRefreshHealth}
                   className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors inline-flex items-center justify-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />

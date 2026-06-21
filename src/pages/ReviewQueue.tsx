@@ -1,33 +1,8 @@
-import React, { useState } from 'react';
-import { Eye, Check, X, FileText, Video, Image, AlertTriangle, RotateCcw, Clock, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, Check, X, FileText, Video, Image, RotateCcw, Clock, User } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { getReviewQueue, approveContent, rejectContent, overrideReview, getReviewAuditTrail } from '../api/review';
 import type { Content, ContentType, ReviewAuditTrail } from '../../shared/types';
-
-const mockPendingContents: Content[] = [
-  { id: 1, title: '2024年度产品发布会预告', type: 'article', status: 'pending_review', created_at: '2024-01-15 10:30', creator_id: 1, content: '', scan_version: 1, updated_at: '2024-01-15 10:30' },
-  { id: 2, title: '新品上市短视频宣传', type: 'video', status: 'pending_review', created_at: '2024-01-15 09:15', creator_id: 1, content: '', scan_version: 1, updated_at: '2024-01-15 09:15' },
-  { id: 3, title: '春节活动海报设计', type: 'poster', status: 'pending_review', created_at: '2024-01-14 16:45', creator_id: 1, content: '', scan_version: 1, updated_at: '2024-01-14 16:45' },
-  { id: 4, title: '客户案例分享文章', type: 'article', status: 'pending_review', created_at: '2024-01-14 14:20', creator_id: 1, content: '', scan_version: 1, updated_at: '2024-01-14 14:20' },
-  { id: 5, title: '品牌日活动宣传视频', type: 'video', status: 'pending_review', created_at: '2024-01-14 11:00', creator_id: 1, content: '', scan_version: 1, updated_at: '2024-01-14 11:00' },
-];
-
-const sensitiveHitCounts: Record<number, number> = {
-  1: 2, 2: 0, 3: 1, 4: 3, 5: 0,
-};
-
-const mockAuditTrails: Record<number, ReviewAuditTrail[]> = {
-  1: [
-    { id: 1, review_record_id: 1, operator_id: 2, action: 'create', previous_decision: null, new_decision: 'approve', opinion: '内容合规', opinion_version: 1, created_at: '2024-01-15 10:30' },
-  ],
-  4: [
-    { id: 2, review_record_id: 2, operator_id: 2, action: 'create', previous_decision: null, new_decision: 'reject', opinion: '存在敏感词', opinion_version: 1, created_at: '2024-01-14 14:20' },
-    { id: 3, review_record_id: 3, operator_id: 3, action: 'override', previous_decision: 'reject', new_decision: 'approve', opinion: '已修改，重新审核通过', opinion_version: 2, created_at: '2024-01-14 16:00' },
-  ],
-};
-
-const contentVersions: Record<number, number> = {
-  1: 1, 4: 2,
-};
 
 const typeIcons: Record<ContentType, typeof FileText> = {
   article: FileText,
@@ -48,6 +23,8 @@ const typeColors: Record<ContentType, string> = {
 };
 
 export default function ReviewQueue() {
+  const [contents, setContents] = useState<Content[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewType, setReviewType] = useState<'approve' | 'reject'>('approve');
@@ -57,6 +34,23 @@ export default function ReviewQueue() {
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [overrideDecision, setOverrideDecision] = useState<'approve' | 'reject'>('approve');
   const [overrideOpinion, setOverrideOpinion] = useState('');
+  const [auditTrail, setAuditTrail] = useState<ReviewAuditTrail[]>([]);
+
+  const loadQueue = async () => {
+    setLoading(true);
+    try {
+      const result = await getReviewQueue({ page: 1, pageSize: 50 });
+      setContents(result.items);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadQueue();
+  }, []);
 
   const handleOpenReview = (content: Content, type: 'approve' | 'reject') => {
     setSelectedContent(content);
@@ -70,17 +64,57 @@ export default function ReviewQueue() {
       alert('驳回意见不能为空');
       return;
     }
+    if (!selectedContent) return;
     setSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setSubmitting(false);
-    setShowReviewModal(false);
-    alert(`已${reviewType === 'approve' ? '通过' : '驳回'}：${selectedContent?.title}`);
+    try {
+      reviewType === 'approve'
+        ? await approveContent(selectedContent.id, opinion)
+        : await rejectContent(selectedContent.id, opinion);
+      setShowReviewModal(false);
+      alert(`已${reviewType === 'approve' ? '通过' : '驳回'}：${selectedContent.title}`);
+      loadQueue();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleViewDetail = (content: Content) => {
+  const handleViewDetail = async (content: Content) => {
     setSelectedContent(content);
+    setAuditTrail([]);
     setShowDetailModal(true);
+    try {
+      const result = await getReviewAuditTrail(content.id, { page: 1, pageSize: 50 });
+      setAuditTrail(result.items);
+    } catch (e) {
+      console.error(e);
+    }
   };
+
+  const handleOverrideReview = async () => {
+    if (!overrideOpinion.trim() || !selectedContent) return;
+    setSubmitting(true);
+    try {
+      await overrideReview(selectedContent.id, overrideDecision, overrideOpinion);
+      setShowOverrideModal(false);
+      setShowDetailModal(false);
+      alert(`已改判为${overrideDecision === 'approve' ? '通过' : '驳回'}：${selectedContent.title}`);
+      loadQueue();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-[#1e3a5f]/30 border-t-[#1e3a5f] rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
@@ -97,15 +131,13 @@ export default function ReviewQueue() {
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">标题</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">类型</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">敏感词命中</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">提交时间</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">版本</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {mockPendingContents.map((item) => {
-                  const hitCount = sensitiveHitCounts[item.id] || 0;
+                {contents.map((item) => {
                   const Icon = typeIcons[item.type];
                   return (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
@@ -118,19 +150,10 @@ export default function ReviewQueue() {
                           {typeLabels[item.type]}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={cn(
-                          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium',
-                          hitCount > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-                        )}>
-                          {hitCount > 0 && <AlertTriangle className="w-3.5 h-3.5" />}
-                          {hitCount} 次
-                        </span>
-                      </td>
                       <td className="px-6 py-4 text-gray-500 text-sm hidden md:table-cell">{item.created_at}</td>
                       <td className="px-6 py-4">
                         <span className="text-sm text-gray-600">
-                          {contentVersions[item.id] ? `v${contentVersions[item.id]}` : '-'}
+                          v{item.scan_version}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -161,9 +184,9 @@ export default function ReviewQueue() {
                     </tr>
                   );
                 })}
-                {mockPendingContents.length === 0 && (
+                {contents.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
                       <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
                       <p>暂无待复核内容</p>
                     </td>
@@ -244,25 +267,21 @@ export default function ReviewQueue() {
               <h4 className="text-xl font-bold text-gray-900 mb-4">{selectedContent.title}</h4>
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
                 <p className="text-gray-700 whitespace-pre-wrap">
-                  这是内容的预览区域。在实际应用中，这里会显示完整的内容正文。\n\n包含多行内容...
+                  {selectedContent.content || '（内容为空）'}
                 </p>
               </div>
               <div className="flex items-center gap-6 text-sm text-gray-500">
                 <span>提交时间：{selectedContent.created_at}</span>
-                <span className="flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" />
-                  敏感词命中：{sensitiveHitCounts[selectedContent.id] || 0} 次
-                </span>
               </div>
 
-              {mockAuditTrails[selectedContent.id] && mockAuditTrails[selectedContent.id].length > 0 && (
+              {auditTrail.length > 0 && (
                 <div className="mt-6">
                   <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     审核轨迹
                   </h5>
                   <div className="space-y-3">
-                    {mockAuditTrails[selectedContent.id].map((trail) => (
+                    {auditTrail.map((trail) => (
                       <div key={trail.id} className="flex gap-3">
                         <div className="flex flex-col items-center">
                           <div className={cn(
@@ -300,7 +319,7 @@ export default function ReviewQueue() {
               )}
             </div>
             <div className="flex gap-4 p-6 border-t border-gray-200">
-              {contentVersions[selectedContent.id] && (
+              {auditTrail.length > 0 && (
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
@@ -377,17 +396,7 @@ export default function ReviewQueue() {
                 取消
               </button>
               <button
-                onClick={async () => {
-                  if (!overrideOpinion.trim()) {
-                    alert('改判意见不能为空');
-                    return;
-                  }
-                  setSubmitting(true);
-                  await new Promise(resolve => setTimeout(resolve, 800));
-                  setSubmitting(false);
-                  setShowOverrideModal(false);
-                  alert(`已改判为${overrideDecision === 'approve' ? '通过' : '驳回'}：${selectedContent.title}`);
-                }}
+                onClick={handleOverrideReview}
                 disabled={submitting || !overrideOpinion.trim()}
                 className="flex-1 py-2.5 px-4 rounded-lg font-medium text-white bg-orange-600 hover:bg-orange-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >

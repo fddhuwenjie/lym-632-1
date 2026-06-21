@@ -1,8 +1,8 @@
 import { get, post, put, del } from '../utils/request';
-import type { Channel, ChannelHealth, ScheduleRiskWarning } from '../types';
+import type { Channel, ChannelHealth, ScheduleRiskWarning, PaginationResult, PaginationParams } from '../types';
 
-export const getChannelList = (): Promise<Channel[]> => {
-  return get<Channel[]>('/channel');
+export const getChannelList = (params?: PaginationParams & { status?: string; type?: string }): Promise<PaginationResult<Channel>> => {
+  return get<PaginationResult<Channel>>('/channel', params as Record<string, string | number | boolean | undefined>);
 };
 
 export interface ChannelStatus {
@@ -14,8 +14,8 @@ export interface ChannelStatus {
   pending_count: number;
 }
 
-export const getChannelStatus = (): Promise<ChannelStatus[]> => {
-  return get<ChannelStatus[]>('/channel/status');
+export const getChannelStatus = (): Promise<{ active_count: number; inactive_count: number; channels: (Channel & { today_schedule_count: number })[] }> => {
+  return get('/channel/status');
 };
 
 export const addChannel = (data: Partial<Channel>): Promise<Channel> => {
@@ -26,8 +26,8 @@ export const updateChannel = (id: number, data: Partial<Channel>): Promise<Chann
   return put<Channel>(`/channel/${id}`, data);
 };
 
-export const deleteChannel = (id: number): Promise<void> => {
-  return del<void>(`/channel/${id}`);
+export const deleteChannel = (id: number): Promise<{ deleted: boolean }> => {
+  return del(`/channel/${id}`);
 };
 
 export const getChannelHealthList = (): Promise<ChannelHealth[]> => {

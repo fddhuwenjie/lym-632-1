@@ -7,7 +7,6 @@ import ScheduleModel from '../models/Schedule.js'
 import ChannelService from '../services/ChannelService.js'
 import type {
   Channel,
-  ChannelHealth,
   PaginationParams,
   PaginationResult,
   ApiResponse,
