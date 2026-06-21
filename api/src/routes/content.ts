@@ -4,7 +4,7 @@ import { authMiddleware, requireRole } from '../middleware/auth.js'
 import { createError } from '../types/index.js'
 import ContentModel from '../models/Content.js'
 import ScheduleModel from '../models/Schedule.js'
-import { scanContent, saveScanRecords, getLatestScanVersion } from '../utils/scanner.js'
+import { scanContent, saveScanRecords, getLatestScanVersion, clearScanRecords } from '../utils/scanner.js'
 import {
   validateSensitiveWordsHandled,
   validateScheduleTime,
@@ -167,6 +167,7 @@ router.put(
       updateParams.content = newContent
       const latestVersion = await getLatestScanVersion()
       updateParams.scan_version = latestVersion
+      await clearScanRecords(id)
       const matches = await scanContent(newContent, latestVersion)
       if (matches.length > 0) {
         await saveScanRecords(id, matches)

@@ -5,7 +5,8 @@ import { createError } from '../types/index.js'
 import ScheduleModel from '../models/Schedule.js'
 import ContentModel from '../models/Content.js'
 import ChannelModel from '../models/Channel.js'
-import { validateScheduleTime, validateDuplicateSchedule } from '../utils/validator.js'
+import ScheduleService from '../services/ScheduleService.js'
+import { validateScheduleTime, validateDuplicateSchedule, validateSensitiveWordsHandled } from '../utils/validator.js'
 import { schedulePublishTask, cancelPublishTask } from '../scheduler/publishTask.js'
 import type {
   Schedule,
@@ -130,6 +131,11 @@ router.post(
       throw createError('只有复核通过的内容才能创建排期', 400)
     }
 
+    const sensitiveCheck = await validateSensitiveWordsHandled(content_id)
+    if (!sensitiveCheck.valid) {
+      throw createError(sensitiveCheck.error!, 400)
+    }
+
     const channel = await ChannelModel.findById(channel_id)
     if (!channel) {
       throw createError('渠道不存在', 404)
@@ -245,9 +251,9 @@ router.put(
   }),
 )
 
-router.delete(
-  '/:id',
-  requireRole('editor', 'admin'),
+router.post(
+  '/:id/withdraw',
+  requireRole('editor', 'reviewer', 'admin'),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       throw createError('用户未登录', 401)
@@ -257,6 +263,12 @@ router.delete(
 
     if (isNaN(id)) {
       throw createError('无效的排期ID', 400)
+    }
+
+    const { reason } = req.body as { reason?: string }
+
+    if (!reason || reason.trim().length === 0) {
+      throw createError('撤回原因不能为空', 400)
     }
 
     const schedule = await ScheduleModel.findById(id, true)
@@ -275,15 +287,62 @@ router.delete(
 
     await cancelPublishTask(id)
 
-    await ScheduleModel.updateStatus(id, 'withdrawn')
+    const updatedSchedule = await ScheduleService.withdrawSchedule(id, reason)
 
     if (schedule.content_id) {
       await ContentModel.updateStatus(schedule.content_id, 'review_approved')
     }
 
-    const response: ApiResponse<{ withdrawn: boolean }> = {
+    const response: ApiResponse<Schedule> = {
       success: true,
-      data: { withdrawn: true },
+      data: updatedSchedule,
+    }
+
+    res.status(200).json(response)
+  }),
+)
+
+router.delete(
+  '/:id',
+  requireRole('editor', 'reviewer', 'admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw createError('用户未登录', 401)
+    }
+
+    const id = parseInt(req.params.id, 10)
+
+    if (isNaN(id)) {
+      throw createError('无效的排期ID', 400)
+    }
+
+    const defaultReason = '排期已删除（原因未填写）'
+
+    const schedule = await ScheduleModel.findById(id, true)
+
+    if (!schedule) {
+      throw createError('排期不存在', 404)
+    }
+
+    if (req.user.role === 'editor' && schedule.content?.creator_id !== req.user.id) {
+      throw createError('无权撤回此排期', 403)
+    }
+
+    if (!['pending', 'approved', 'scheduled'].includes(schedule.status)) {
+      throw createError('只有待审核、已通过或已排期的排期才能撤回', 400)
+    }
+
+    await cancelPublishTask(id)
+
+    const updatedSchedule = await ScheduleService.withdrawSchedule(id, defaultReason)
+
+    if (schedule.content_id) {
+      await ContentModel.updateStatus(schedule.content_id, 'review_approved')
+    }
+
+    const response: ApiResponse<Schedule> = {
+      success: true,
+      data: updatedSchedule,
     }
 
     res.status(200).json(response)

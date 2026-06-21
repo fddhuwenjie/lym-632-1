@@ -151,6 +151,8 @@ export async function submitForSchedule(
       scan_version: latestVersion,
     })
 
+    tx.prepare('DELETE FROM scan_records WHERE content_id = ?').run(contentId)
+
     const matches = await scanContent(content.content, latestVersion)
     if (matches.length > 0) {
       const insertStmt = tx.prepare(`

@@ -125,23 +125,31 @@ export async function withdrawSchedule(
     throw createError('撤回原因不能为空', 400, 'EMPTY_REASON')
   }
 
-  return transaction(async (tx) => {
-    const updatedSchedule = await ScheduleModel.update(scheduleId, {
-      status: 'withdrawn',
-    })
+  return transaction((tx) => {
+    tx.prepare(`UPDATE schedules SET status = 'withdrawn' WHERE id = ?`)
+      .run(scheduleId)
 
-    if (!updatedSchedule) {
-      throw createError('撤回排期失败', 500, 'WITHDRAW_FAILED')
+    const existingRecord = tx
+      .prepare(`SELECT id FROM publish_records WHERE schedule_id = ? ORDER BY id DESC LIMIT 1`)
+      .get(scheduleId) as { id: number } | undefined
+
+    if (existingRecord) {
+      const updateStmt = tx.prepare(`
+        UPDATE publish_records
+        SET status = 'withdrawn', withdraw_reason = ?
+        WHERE id = ?
+      `)
+      updateStmt.run(reason, existingRecord.id)
+    } else {
+      const insertStmt = tx.prepare(`
+        INSERT INTO publish_records (schedule_id, status, withdraw_reason, created_at)
+        VALUES (?, 'withdrawn', ?, ?)
+      `)
+      insertStmt.run(scheduleId, reason, new Date().toISOString())
     }
 
-    const updateStmt = tx.prepare(`
-      UPDATE publish_records
-      SET status = 'withdrawn', withdraw_reason = ?
-      WHERE schedule_id = ? AND status = 'pending'
-    `)
-    updateStmt.run(reason, scheduleId)
-
-    return updatedSchedule
+    const result = tx.prepare(`SELECT * FROM schedules WHERE id = ?`).get(scheduleId) as Schedule
+    return result
   })
 }
 
