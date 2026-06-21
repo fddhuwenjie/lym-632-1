@@ -1,5 +1,5 @@
 import db from '../db/index.js'
-import type { SensitiveWord, ScanRecord } from '../../../shared/types.js'
+import type { SensitiveWord } from '../../../shared/types.js'
 
 export interface ScanMatch {
   word_id: number

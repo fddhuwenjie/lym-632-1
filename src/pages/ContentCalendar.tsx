@@ -61,7 +61,7 @@ export default function ContentCalendar() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  const { days, firstDayOfWeek, daysInMonth } = useMemo(() => {
+  const { days } = useMemo(() => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const firstDayOfWeek = firstDay.getDay();
@@ -74,7 +74,7 @@ export default function ContentCalendar() {
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
-    return { days, firstDayOfWeek, daysInMonth };
+    return { days };
   }, [year, month]);
 
   const getSchedulesForDate = (day: number) => {

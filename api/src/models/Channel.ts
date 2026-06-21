@@ -137,7 +137,7 @@ export async function countByStatus(status: 'active' | 'inactive'): Promise<numb
 export async function update(id: number, params: UpdateChannelParams): Promise<Channel | null> {
   return transaction((tx) => {
     const fields: string[] = []
-    const values: any[] = []
+    const values: (string | number | boolean | null | undefined)[] = []
 
     if (params.name !== undefined) {
       fields.push('name = ?')

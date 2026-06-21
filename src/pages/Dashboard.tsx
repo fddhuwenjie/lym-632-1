@@ -38,9 +38,9 @@ const typeColors: Record<ContentType, string> = {
 };
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>(mockStats);
-  const [pending, setPending] = useState<Content[]>(mockPending);
-  const [schedules, setSchedules] = useState<Schedule[]>(mockSchedules);
+  const [stats] = useState<DashboardStats>(mockStats);
+  const [pending] = useState<Content[]>(mockPending);
+  const [schedules] = useState<Schedule[]>(mockSchedules);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

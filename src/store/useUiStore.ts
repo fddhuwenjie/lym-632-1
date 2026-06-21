@@ -13,7 +13,7 @@ interface ModalState {
   show: boolean;
   type: ModalType;
   title: string;
-  content: any;
+  content: React.ReactNode;
 }
 
 interface UiState {
@@ -21,7 +21,7 @@ interface UiState {
   modal: ModalState;
   showToast: (type: ToastType, message: string) => void;
   hideToast: () => void;
-  showModal: (type: ModalType, title: string, content: any) => void;
+  showModal: (type: ModalType, title: string, content: React.ReactNode) => void;
   hideModal: () => void;
 }
 
@@ -66,7 +66,7 @@ export const useUiStore = create<UiState>((set) => ({
     }));
   },
 
-  showModal: (type: ModalType, title: string, content: any) => {
+  showModal: (type: ModalType, title: string, content: React.ReactNode) => {
     set({
       modal: {
         show: true,

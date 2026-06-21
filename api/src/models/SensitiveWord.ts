@@ -212,7 +212,7 @@ export async function deactivateOldVersions(keepVersions: number = 2): Promise<n
 export async function update(id: number, params: UpdateSensitiveWordParams): Promise<SensitiveWord | null> {
   return transaction((tx) => {
     const fields: string[] = []
-    const values: any[] = []
+    const values: (string | number | boolean | null | undefined)[] = []
 
     if (params.word !== undefined) {
       fields.push('word = ?')

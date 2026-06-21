@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Check, X, FileText, Video, Image, AlertTriangle, Send } from 'lucide-react';
+import { Eye, Check, X, FileText, Video, Image, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { Content, ContentType } from '../../shared/types';
 

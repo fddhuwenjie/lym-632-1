@@ -5,11 +5,18 @@ import type {
   PaginationParams,
 } from '../types';
 
-export const exportPublishRecords = (filters: any): Promise<ExportRecord> => {
+export interface ExportFilters {
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+  channel_id?: number;
+}
+
+export const exportPublishRecords = (filters: ExportFilters): Promise<ExportRecord> => {
   return post<ExportRecord>('/export/publish', filters);
 };
 
-export const getExportRecords = (params?: PaginationParams & { [key: string]: any }): Promise<PaginationResult<ExportRecord>> => {
+export const getExportRecords = (params?: PaginationParams & { [key: string]: string | number | boolean | undefined }): Promise<PaginationResult<ExportRecord>> => {
   return get<PaginationResult<ExportRecord>>('/export', params);
 };
 

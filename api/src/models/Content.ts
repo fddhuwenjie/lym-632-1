@@ -189,7 +189,7 @@ export async function findByType(type: ContentType, params?: PaginationParams): 
 export async function update(id: number, params: UpdateContentParams): Promise<Content | null> {
   return transaction((tx) => {
     const fields: string[] = ['updated_at = ?']
-    const values: any[] = [new Date().toISOString()]
+    const values: (string | number | boolean | null | undefined)[] = [new Date().toISOString()]
 
     if (params.title !== undefined) {
       fields.push('title = ?')

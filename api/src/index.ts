@@ -7,7 +7,6 @@ import express, {
 import cors from 'cors'
 import dotenv from 'dotenv'
 import { errorHandler, notFoundHandler } from './middleware/error.js'
-import { authMiddleware } from './middleware/auth.js'
 import { initDatabase, seedData } from './models/index.js'
 import { initPublishScheduler } from './scheduler/publishTask.js'
 import authRoutes from './routes/auth.js'
@@ -34,7 +33,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next()
 })
 
-app.get('/api/health', (req: Request, res: Response, next: NextFunction): void => {
+app.get('/api/health', (req: Request, res: Response): void => {
   const response: ApiResponse<string> = {
     success: true,
     data: 'ok',

@@ -7,7 +7,7 @@ import type {
   PaginationParams,
 } from '../types';
 
-export const getScheduleList = (params?: PaginationParams & { [key: string]: any }): Promise<PaginationResult<Schedule>> => {
+export const getScheduleList = (params?: PaginationParams & { [key: string]: string | number | boolean | undefined }): Promise<PaginationResult<Schedule>> => {
   return get<PaginationResult<Schedule>>('/schedule', params);
 };
 

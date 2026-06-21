@@ -1,9 +1,8 @@
 import schedule from 'node-schedule'
 import db, { transaction } from '../db/index.js'
 import ScheduleModel from '../models/Schedule.js'
-import ContentModel from '../models/Content.js'
 import PublishRecordModel from '../models/PublishRecord.js'
-import type { Schedule, PublishStatus } from '../../../shared/types.js'
+import type { Schedule } from '../../../shared/types.js'
 
 const scheduledTasks = new Map<number, schedule.Job>()
 

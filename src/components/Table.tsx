@@ -27,7 +27,7 @@ export interface TableProps<T> {
   className?: string;
 }
 
-export default function Table<T extends Record<string, any>>({
+export default function Table<T extends Record<string, unknown>>({
   columns,
   data,
   loading = false,
@@ -68,12 +68,12 @@ export default function Table<T extends Record<string, any>>({
     });
   }, [data, sortKey, sortOrder]);
 
-  const renderCell = (column: Column<T>, record: T, index: number) => {
+  const renderCell = (column: Column<T>, record: T, index: number): React.ReactNode => {
     if (column.render) {
       return column.render(record, index);
     }
     if (column.dataIndex) {
-      return record[column.dataIndex];
+      return record[column.dataIndex] as React.ReactNode;
     }
     return null;
   };

@@ -1,5 +1,5 @@
 import db from '../db/index.js'
-import type { Content, Schedule } from '../../../shared/types.js'
+import type { Content } from '../../../shared/types.js'
 
 export async function validateSensitiveWordsHandled(
   contentId: number,

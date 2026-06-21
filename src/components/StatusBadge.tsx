@@ -49,6 +49,10 @@ const statusConfig: Record<StatusType, { label: string; className: string }> = {
     label: '已拒绝',
     className: 'bg-red-100 text-red-700',
   },
+  publishing: {
+    label: '发布中',
+    className: 'bg-blue-100 text-blue-700',
+  },
   success: {
     label: '发布成功',
     className: 'bg-green-100 text-green-700',

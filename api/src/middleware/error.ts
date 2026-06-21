@@ -6,7 +6,6 @@ export function errorHandler(
   error: Error | ValidationError,
   req: Request,
   res: Response,
-  next: NextFunction,
 ): void {
   console.error(`[Error] ${req.method} ${req.path}:`, error)
 

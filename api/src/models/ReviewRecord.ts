@@ -53,31 +53,31 @@ export async function findById(id: number, includeRelations = false): Promise<Re
   }
 
   const stmt = db.prepare(sql)
-  const result = stmt.get(id) as any
+  const result = stmt.get(id) as Record<string, unknown> | null
 
   if (!result) return null
 
   if (includeRelations) {
     const record: ReviewRecord = {
-      id: result.id,
-      content_id: result.content_id,
-      reviewer_id: result.reviewer_id,
-      decision: result.decision,
-      opinion: result.opinion,
-      created_at: result.created_at,
+      id: result.id as number,
+      content_id: result.content_id as number,
+      reviewer_id: result.reviewer_id as number,
+      decision: result.decision as unknown as 'approve' | 'reject',
+      opinion: result.opinion as string | null,
+      created_at: result.created_at as string,
     }
     if (result['reviewer.id']) {
       record.reviewer = {
-        id: result['reviewer.id'],
-        username: result['reviewer.username'],
-        role: result['reviewer.role'],
-        created_at: result['reviewer.created_at'],
+        id: result['reviewer.id'] as number,
+        username: result['reviewer.username'] as string,
+        role: result['reviewer.role'] as unknown as 'editor' | 'reviewer' | 'admin',
+        created_at: result['reviewer.created_at'] as string,
       }
     }
     return record
   }
 
-  return result as ReviewRecord
+  return result as unknown as ReviewRecord
 }
 
 export async function findAll(params?: PaginationParams): Promise<PaginationResult<ReviewRecord>> {
@@ -246,7 +246,7 @@ export async function countByReviewerId(reviewerId: number): Promise<number> {
 export async function update(id: number, params: UpdateReviewRecordParams): Promise<ReviewRecord | null> {
   return transaction((tx) => {
     const fields: string[] = []
-    const values: any[] = []
+    const values: (string | number | boolean | null | undefined)[] = []
 
     if (params.decision !== undefined) {
       fields.push('decision = ?')

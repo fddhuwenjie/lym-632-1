@@ -5,6 +5,6 @@ import type {
   PaginationParams,
 } from '../types';
 
-export const getPublishRecords = (params?: PaginationParams & { [key: string]: any }): Promise<PaginationResult<PublishRecord>> => {
+export const getPublishRecords = (params?: PaginationParams & { [key: string]: string | number | boolean | undefined }): Promise<PaginationResult<PublishRecord>> => {
   return get<PaginationResult<PublishRecord>>('/publish', params);
 };

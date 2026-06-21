@@ -17,8 +17,6 @@ import type {
   ApiResponse,
   PaginationResult,
   PaginationParams,
-  ContentType,
-  ContentStatus,
 } from '../../shared/types';
 
 const api = axios.create({

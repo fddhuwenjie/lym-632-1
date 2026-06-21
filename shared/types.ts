@@ -4,11 +4,11 @@ export type ContentType = 'article' | 'video' | 'poster';
 
 export type ContentStatus = 'draft' | 'pending_review' | 'review_approved' | 'review_rejected' | 'scheduled' | 'published' | 'withdrawn';
 
-export type ScheduleStatus = 'pending' | 'approved' | 'rejected' | 'scheduled' | 'published' | 'withdrawn';
+export type ScheduleStatus = 'pending' | 'approved' | 'rejected' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'withdrawn';
 
 export type ReviewDecision = 'approve' | 'reject';
 
-export type PublishStatus = 'pending' | 'success' | 'failed' | 'withdrawn';
+export type PublishStatus = 'pending' | 'scheduled' | 'publishing' | 'success' | 'failed' | 'withdrawn';
 
 export interface User {
   id: number;
@@ -109,7 +109,7 @@ export interface LoginResponse {
   token: string;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;

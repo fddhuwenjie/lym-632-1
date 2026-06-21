@@ -32,6 +32,7 @@ router.post(
     const token = Buffer.from(`${userWithPassword.id}:${Date.now()}`).toString('base64')
 
     const { password_hash, ...user } = userWithPassword
+    void password_hash
 
     const response: ApiResponse<LoginResponse> = {
       success: true,

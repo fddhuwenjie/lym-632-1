@@ -86,34 +86,34 @@ export async function findById(id: number, includeRelations = false): Promise<Sc
   }
 
   const stmt = db.prepare(sql)
-  const result = stmt.get(id) as any
+  const result = stmt.get(id) as Record<string, unknown> | null
 
   if (!result) return null
 
   if (includeRelations) {
     const record: ScanRecord = {
-      id: result.id,
-      content_id: result.content_id,
-      word_id: result.word_id,
-      version: result.version,
-      matched_text: result.matched_text,
-      position: result.position,
-      created_at: result.created_at,
+      id: result.id as number,
+      content_id: result.content_id as number,
+      word_id: result.word_id as number,
+      version: result.version as number,
+      matched_text: result.matched_text as string,
+      position: result.position as number,
+      created_at: result.created_at as string,
     }
     if (result['word.id']) {
       record.word = {
-        id: result['word.id'],
-        word: result['word.word'],
-        category: result['word.category'],
-        version: result['word.version'],
-        is_active: result['word.is_active'],
-        created_at: result['word.created_at'],
+        id: result['word.id'] as number,
+        word: result['word.word'] as string,
+        category: result['word.category'] as string,
+        version: result['word.version'] as number,
+        is_active: result['word.is_active'] === 1,
+        created_at: result['word.created_at'] as string,
       }
     }
     return record
   }
 
-  return result as ScanRecord
+  return result as unknown as ScanRecord
 }
 
 export async function findAll(params?: PaginationParams): Promise<PaginationResult<ScanRecord>> {
@@ -293,7 +293,7 @@ export async function deleteByContentId(contentId: number): Promise<number> {
 export async function update(id: number, params: UpdateScanRecordParams): Promise<ScanRecord | null> {
   return transaction((tx) => {
     const fields: string[] = []
-    const values: any[] = []
+    const values: (string | number | boolean | null | undefined)[] = []
 
     if (params.handled !== undefined) {
       fields.push('handled = ?')

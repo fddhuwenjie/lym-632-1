@@ -1,5 +1,5 @@
 import db, { transaction } from '../db/index.js'
-import type { PublishRecord, PublishStatus, PaginationParams, PaginationResult } from '../../../shared/types.js'
+import type { PublishRecord, PublishStatus, ScheduleStatus, PaginationParams, PaginationResult } from '../../../shared/types.js'
 
 export interface CreatePublishRecordParams {
   schedule_id: number
@@ -59,35 +59,35 @@ export async function findById(id: number, includeRelations = false): Promise<Pu
   }
 
   const stmt = db.prepare(sql)
-  const result = stmt.get(id) as any
+  const result = stmt.get(id) as Record<string, unknown> | null
 
   if (!result) return null
 
   if (includeRelations) {
     const record: PublishRecord = {
-      id: result.id,
-      schedule_id: result.schedule_id,
-      status: result.status,
-      result: result.result,
-      withdraw_reason: result.withdraw_reason,
-      publish_time: result.publish_time,
-      created_at: result.created_at,
+      id: result.id as number,
+      schedule_id: result.schedule_id as number,
+      status: result.status as unknown as PublishStatus,
+      result: result.result as string | null,
+      withdraw_reason: result.withdraw_reason as string | null,
+      publish_time: result.publish_time as string | null,
+      created_at: result.created_at as string,
     }
     if (result['schedule.id']) {
       record.schedule = {
-        id: result['schedule.id'],
-        content_id: result['schedule.content_id'],
-        channel_id: result['schedule.channel_id'],
-        schedule_time: result['schedule.schedule_time'],
-        status: result['schedule.status'],
-        created_at: result['schedule.created_at'],
-        updated_at: result['schedule.updated_at'],
+        id: result['schedule.id'] as number,
+        content_id: result['schedule.content_id'] as number,
+        channel_id: result['schedule.channel_id'] as number,
+        schedule_time: result['schedule.schedule_time'] as string,
+        status: result['schedule.status'] as unknown as ScheduleStatus,
+        created_at: result['schedule.created_at'] as string,
+        updated_at: result['schedule.updated_at'] as string,
       }
     }
     return record
   }
 
-  return result as PublishRecord
+  return result as unknown as PublishRecord
 }
 
 export async function findAll(params?: PaginationParams): Promise<PaginationResult<PublishRecord>> {
@@ -274,7 +274,7 @@ export async function getSuccessRateByDateRange(startTime: string, endTime: stri
 export async function update(id: number, params: UpdatePublishRecordParams): Promise<PublishRecord | null> {
   return transaction((tx) => {
     const fields: string[] = []
-    const values: any[] = []
+    const values: (string | number | boolean | null | undefined)[] = []
 
     if (params.status !== undefined) {
       fields.push('status = ?')

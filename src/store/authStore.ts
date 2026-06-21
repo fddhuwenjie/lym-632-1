@@ -30,8 +30,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.setItem('user', JSON.stringify(user));
       set({ user, token, isAuthenticated: true, loading: false });
       return true;
-    } catch (error: any) {
-      const message = error.response?.data?.message || '登录失败，请稍后重试';
+    } catch (error) {
+      const message = error instanceof Error && 'response' in error 
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || '登录失败，请稍后重试'
+        : '登录失败，请稍后重试';
       set({ error: message, loading: false });
       return false;
     }

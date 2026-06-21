@@ -99,7 +99,7 @@ export async function findByRole(role: UserRole, params?: PaginationParams): Pro
 export async function update(id: number, params: UpdateUserParams): Promise<User | null> {
   return transaction((tx) => {
     const fields: string[] = []
-    const values: any[] = []
+    const values: (string | number | boolean | null | undefined)[] = []
 
     if (params.username !== undefined) {
       fields.push('username = ?')

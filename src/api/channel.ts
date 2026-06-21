@@ -5,8 +5,17 @@ export const getChannelList = (): Promise<Channel[]> => {
   return get<Channel[]>('/channel');
 };
 
-export const getChannelStatus = (): Promise<any[]> => {
-  return get<any[]>('/channel/status');
+export interface ChannelStatus {
+  channel_id: number;
+  channel_name: string;
+  total_count: number;
+  success_count: number;
+  failed_count: number;
+  pending_count: number;
+}
+
+export const getChannelStatus = (): Promise<ChannelStatus[]> => {
+  return get<ChannelStatus[]>('/channel/status');
 };
 
 export const addChannel = (data: Partial<Channel>): Promise<Channel> => {

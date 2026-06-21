@@ -59,47 +59,47 @@ export async function findById(id: number, includeRelations = false): Promise<Sc
   }
 
   const stmt = db.prepare(sql)
-  const result = stmt.get(id) as any
+  const result = stmt.get(id) as Record<string, unknown> | null
 
   if (!result) return null
 
   if (includeRelations) {
     const schedule: Schedule = {
-      id: result.id,
-      content_id: result.content_id,
-      channel_id: result.channel_id,
-      schedule_time: result.schedule_time,
-      status: result.status,
-      created_at: result.created_at,
-      updated_at: result.updated_at,
+      id: result.id as number,
+      content_id: result.content_id as number,
+      channel_id: result.channel_id as number,
+      schedule_time: result.schedule_time as string,
+      status: result.status as unknown as 'pending' | 'approved' | 'rejected' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'withdrawn',
+      created_at: result.created_at as string,
+      updated_at: result.updated_at as string,
     }
     if (result['content.id']) {
       schedule.content = {
-        id: result['content.id'],
-        creator_id: result['content.creator_id'],
-        type: result['content.type'],
-        title: result['content.title'],
-        content: result['content.content'],
-        thumbnail_url: result['content.thumbnail_url'],
-        status: result['content.status'],
-        scan_version: result['content.scan_version'],
-        created_at: result['content.created_at'],
-        updated_at: result['content.updated_at'],
+        id: result['content.id'] as number,
+        creator_id: result['content.creator_id'] as number,
+        type: result['content.type'] as unknown as 'article' | 'video' | 'poster',
+        title: result['content.title'] as string,
+        content: result['content.content'] as string,
+        thumbnail_url: result['content.thumbnail_url'] as string | null,
+        status: result['content.status'] as unknown as 'draft' | 'pending_review' | 'review_approved' | 'review_rejected' | 'scheduled' | 'published' | 'withdrawn',
+        scan_version: result['content.scan_version'] as number,
+        created_at: result['content.created_at'] as string,
+        updated_at: result['content.updated_at'] as string,
       }
     }
     if (result['channel.id']) {
       schedule.channel = {
-        id: result['channel.id'],
-        name: result['channel.name'],
-        type: result['channel.type'],
-        status: result['channel.status'],
-        config: result['channel.config'],
+        id: result['channel.id'] as number,
+        name: result['channel.name'] as string,
+        type: result['channel.type'] as string,
+        status: result['channel.status'] as unknown as 'active' | 'inactive',
+        config: result['channel.config'] as string | null,
       }
     }
     return schedule
   }
 
-  return result as Schedule
+  return result as unknown as Schedule
 }
 
 export async function findAll(params?: PaginationParams): Promise<PaginationResult<Schedule>> {
@@ -243,7 +243,7 @@ export async function findScheduledToPublish(beforeTime: string, params?: Pagina
 export async function update(id: number, params: UpdateScheduleParams): Promise<Schedule | null> {
   return transaction((tx) => {
     const fields: string[] = ['updated_at = ?']
-    const values: any[] = [new Date().toISOString()]
+    const values: (string | number | boolean | null | undefined)[] = [new Date().toISOString()]
 
     if (params.channel_id !== undefined) {
       fields.push('channel_id = ?')

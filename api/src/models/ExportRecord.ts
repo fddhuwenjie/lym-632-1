@@ -44,29 +44,29 @@ export async function findById(id: number, includeRelations = false): Promise<Ex
   }
 
   const stmt = db.prepare(sql)
-  const result = stmt.get(id) as any
+  const result = stmt.get(id) as Record<string, unknown> | null
 
   if (!result) return null
 
   if (includeRelations) {
     const record: ExportRecord = {
-      id: result.id,
-      operator_id: result.operator_id,
-      file_path: result.file_path,
-      created_at: result.created_at,
+      id: result.id as number,
+      operator_id: result.operator_id as number,
+      file_path: result.file_path as string,
+      created_at: result.created_at as string,
     }
     if (result['operator.id']) {
       record.operator = {
-        id: result['operator.id'],
-        username: result['operator.username'],
-        role: result['operator.role'],
-        created_at: result['operator.created_at'],
+        id: result['operator.id'] as number,
+        username: result['operator.username'] as string,
+        role: result['operator.role'] as unknown as 'editor' | 'reviewer' | 'admin',
+        created_at: result['operator.created_at'] as string,
       }
     }
     return record
   }
 
-  return result as ExportRecord
+  return result as unknown as ExportRecord
 }
 
 export async function findAll(params?: PaginationParams): Promise<PaginationResult<ExportRecord>> {
@@ -146,7 +146,7 @@ export async function countByOperatorId(operatorId: number): Promise<number> {
 export async function update(id: number, params: UpdateExportRecordParams): Promise<ExportRecord | null> {
   return transaction((tx) => {
     const fields: string[] = []
-    const values: any[] = []
+    const values: (string | number | boolean | null | undefined)[] = []
 
     if (params.file_path !== undefined) {
       fields.push('file_path = ?')

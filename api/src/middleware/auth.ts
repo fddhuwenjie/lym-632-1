@@ -36,7 +36,7 @@ export function authMiddleware(
 
     req.user = user
     next()
-  } catch (error) {
+  } catch {
     res.status(401).json({
       success: false,
       error: '认证令牌无效',

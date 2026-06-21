@@ -6,7 +6,7 @@ import type {
   PaginationParams,
 } from '../types';
 
-export const getWordList = (params?: PaginationParams & { [key: string]: any }): Promise<PaginationResult<SensitiveWord>> => {
+export const getWordList = (params?: PaginationParams & { [key: string]: string | number | boolean | undefined }): Promise<PaginationResult<SensitiveWord>> => {
   return get<PaginationResult<SensitiveWord>>('/sensitive/words', params);
 };
 
@@ -22,6 +22,6 @@ export const deleteWord = (id: number): Promise<void> => {
   return del<void>(`/sensitive/words/${id}`);
 };
 
-export const getScanRecords = (params?: PaginationParams & { [key: string]: any }): Promise<PaginationResult<ScanRecord>> => {
+export const getScanRecords = (params?: PaginationParams & { [key: string]: string | number | boolean | undefined }): Promise<PaginationResult<ScanRecord>> => {
   return get<PaginationResult<ScanRecord>>('/sensitive/scans', params);
 };

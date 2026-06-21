@@ -6,7 +6,7 @@ import type {
   PaginationParams,
 } from '../types';
 
-export const getReviewQueue = (params?: PaginationParams & { [key: string]: any }): Promise<PaginationResult<Content>> => {
+export const getReviewQueue = (params?: PaginationParams & { [key: string]: string | number | boolean | undefined }): Promise<PaginationResult<Content>> => {
   return get<PaginationResult<Content>>('/review/queue', params);
 };
 

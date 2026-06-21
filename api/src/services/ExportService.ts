@@ -12,6 +12,8 @@ import type {
   PublishRecord,
   PaginationParams,
   PaginationResult,
+  PublishStatus,
+  ScheduleStatus,
 } from '../../../shared/types.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -104,7 +106,7 @@ export async function exportPublishRecords(
     const record: PublishRecord = {
       id: row.id,
       schedule_id: row.schedule_id,
-      status: row.status as any,
+      status: row.status as unknown as PublishStatus,
       result: row.result,
       withdraw_reason: row.withdraw_reason,
       publish_time: row.publish_time,
@@ -118,7 +120,7 @@ export async function exportPublishRecords(
         content_id: row['schedule.content_id'],
         channel_id: row['schedule.channel_id'],
         schedule_time: row['schedule.schedule_time'],
-        status: row['schedule.status'] as any,
+        status: row['schedule.status'] as unknown as ScheduleStatus,
         created_at: row['schedule.created_at'],
         updated_at: row['schedule.updated_at'],
         content: undefined,
@@ -129,7 +131,7 @@ export async function exportPublishRecords(
         record.schedule.content = {
           id: row['content.id'],
           creator_id: 0,
-          type: row['content.type'] as any,
+          type: row['content.type'] as unknown as 'article' | 'video' | 'poster',
           title: row['content.title'],
           content: '',
           status: 'draft',

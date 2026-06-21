@@ -8,7 +8,7 @@ import type {
   SubmitScheduleRequest,
 } from '../types';
 
-export const getContentList = (params?: PaginationParams & { [key: string]: any }): Promise<PaginationResult<Content>> => {
+export const getContentList = (params?: PaginationParams & { [key: string]: string | number | boolean | undefined }): Promise<PaginationResult<Content>> => {
   return get<PaginationResult<Content>>('/content', params);
 };
 
