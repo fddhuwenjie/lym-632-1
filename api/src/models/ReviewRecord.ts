@@ -6,30 +6,33 @@ export interface CreateReviewRecordParams {
   reviewer_id: number
   decision: ReviewDecision
   opinion: string
+  opinion_version?: number
 }
 
 export interface UpdateReviewRecordParams {
   decision?: ReviewDecision
   opinion?: string
+  opinion_version?: number
 }
 
 export async function create(params: CreateReviewRecordParams): Promise<ReviewRecord> {
   return transaction((tx) => {
     const now = new Date().toISOString()
     const stmt = tx.prepare(`
-      INSERT INTO review_records (content_id, reviewer_id, decision, opinion, created_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO review_records (content_id, reviewer_id, decision, opinion, opinion_version, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
     `)
     const result = stmt.run(
       params.content_id,
       params.reviewer_id,
       params.decision,
       params.opinion,
+      params.opinion_version || 1,
       now,
     )
     const id = result.lastInsertRowid as number
     const selectStmt = tx.prepare(`
-      SELECT id, content_id, reviewer_id, decision, opinion, created_at
+      SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
       FROM review_records
       WHERE id = ?
     `)
@@ -39,7 +42,7 @@ export async function create(params: CreateReviewRecordParams): Promise<ReviewRe
 
 export async function findById(id: number, includeRelations = false): Promise<ReviewRecord | null> {
   let sql = `
-    SELECT rr.id, rr.content_id, rr.reviewer_id, rr.decision, rr.opinion, rr.created_at
+    SELECT rr.id, rr.content_id, rr.reviewer_id, rr.decision, rr.opinion, rr.opinion_version, rr.created_at
   `
   if (includeRelations) {
     sql += `,
@@ -64,6 +67,7 @@ export async function findById(id: number, includeRelations = false): Promise<Re
       reviewer_id: result.reviewer_id as number,
       decision: result.decision as unknown as 'approve' | 'reject',
       opinion: result.opinion as string | null,
+      opinion_version: result.opinion_version as number,
       created_at: result.created_at as string,
     }
     if (result['reviewer.id']) {
@@ -89,7 +93,7 @@ export async function findAll(params?: PaginationParams): Promise<PaginationResu
   const { total } = countStmt.get() as { total: number }
 
   const stmt = db.prepare(`
-    SELECT id, content_id, reviewer_id, decision, opinion, created_at
+    SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
     FROM review_records
     ORDER BY created_at DESC
     LIMIT ? OFFSET ?
@@ -111,7 +115,7 @@ export async function findByContentId(
   const { total } = countStmt.get(contentId) as { total: number }
 
   const stmt = db.prepare(`
-    SELECT id, content_id, reviewer_id, decision, opinion, created_at
+    SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
     FROM review_records
     WHERE content_id = ?
     ORDER BY created_at DESC
@@ -124,7 +128,7 @@ export async function findByContentId(
 
 export async function getLatestByContentId(contentId: number): Promise<ReviewRecord | null> {
   const stmt = db.prepare(`
-    SELECT id, content_id, reviewer_id, decision, opinion, created_at
+    SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
     FROM review_records
     WHERE content_id = ?
     ORDER BY created_at DESC
@@ -145,7 +149,7 @@ export async function findByReviewerId(
   const { total } = countStmt.get(reviewerId) as { total: number }
 
   const stmt = db.prepare(`
-    SELECT id, content_id, reviewer_id, decision, opinion, created_at
+    SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
     FROM review_records
     WHERE reviewer_id = ?
     ORDER BY created_at DESC
@@ -168,7 +172,7 @@ export async function findByDecision(
   const { total } = countStmt.get(decision) as { total: number }
 
   const stmt = db.prepare(`
-    SELECT id, content_id, reviewer_id, decision, opinion, created_at
+    SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
     FROM review_records
     WHERE decision = ?
     ORDER BY created_at DESC
@@ -194,7 +198,7 @@ export async function findByTimeRange(
   const { total } = countStmt.get(startTime, endTime) as { total: number }
 
   const stmt = db.prepare(`
-    SELECT id, content_id, reviewer_id, decision, opinion, created_at
+    SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
     FROM review_records
     WHERE created_at >= ? AND created_at <= ?
     ORDER BY created_at DESC
@@ -220,7 +224,7 @@ export async function findByReviewerIdAndDecision(
   const { total } = countStmt.get(reviewerId, decision) as { total: number }
 
   const stmt = db.prepare(`
-    SELECT id, content_id, reviewer_id, decision, opinion, created_at
+    SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
     FROM review_records
     WHERE reviewer_id = ? AND decision = ?
     ORDER BY created_at DESC
@@ -256,9 +260,13 @@ export async function update(id: number, params: UpdateReviewRecordParams): Prom
       fields.push('opinion = ?')
       values.push(params.opinion)
     }
+    if (params.opinion_version !== undefined) {
+      fields.push('opinion_version = ?')
+      values.push(params.opinion_version)
+    }
 
     const selectStmt = tx.prepare(`
-      SELECT id, content_id, reviewer_id, decision, opinion, created_at
+      SELECT id, content_id, reviewer_id, decision, opinion, opinion_version, created_at
       FROM review_records
       WHERE id = ?
     `)

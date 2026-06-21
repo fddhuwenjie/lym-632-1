@@ -4,8 +4,10 @@ import { authMiddleware, requireRole } from '../middleware/auth.js'
 import { createError } from '../types/index.js'
 import ChannelModel from '../models/Channel.js'
 import ScheduleModel from '../models/Schedule.js'
+import ChannelService from '../services/ChannelService.js'
 import type {
   Channel,
+  ChannelHealth,
   PaginationParams,
   PaginationResult,
   ApiResponse,
@@ -172,6 +174,88 @@ router.put(
       data: updatedChannel!,
     }
 
+    res.status(200).json(response)
+  }),
+)
+
+router.get(
+  '/health',
+  requireRole('editor', 'reviewer', 'admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const healthList = await ChannelService.getChannelHealthList()
+    const response: ApiResponse<typeof healthList> = {
+      success: true,
+      data: healthList,
+    }
+    res.status(200).json(response)
+  }),
+)
+
+router.get(
+  '/:id/health',
+  requireRole('editor', 'reviewer', 'admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw createError('无效的渠道ID', 400)
+    const health = await ChannelService.getChannelHealth(id)
+    const response: ApiResponse<typeof health> = {
+      success: true,
+      data: health,
+    }
+    res.status(200).json(response)
+  }),
+)
+
+router.put(
+  '/:id/health',
+  requireRole('admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw createError('无效的渠道ID', 400)
+    const { success_rate, last_failure_reason, rate_limit_status, responsible_person } = req.body as {
+      success_rate?: number
+      last_failure_reason?: string
+      rate_limit_status?: string
+      responsible_person?: string
+    }
+    const updated = await ChannelService.updateChannelHealth(id, {
+      success_rate,
+      last_failure_reason,
+      rate_limit_status: rate_limit_status as 'normal' | 'limited' | 'blocked' | undefined,
+      responsible_person,
+    })
+    const response: ApiResponse<typeof updated> = {
+      success: true,
+      data: updated,
+    }
+    res.status(200).json(response)
+  }),
+)
+
+router.post(
+  '/:id/health/refresh',
+  requireRole('admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw createError('无效的渠道ID', 400)
+    const health = await ChannelService.refreshChannelHealth(id)
+    const response: ApiResponse<typeof health> = {
+      success: true,
+      data: health,
+    }
+    res.status(200).json(response)
+  }),
+)
+
+router.get(
+  '/risk/high',
+  requireRole('editor', 'reviewer', 'admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const highRisk = await ChannelService.getHighRiskChannels()
+    const response: ApiResponse<typeof highRisk> = {
+      success: true,
+      data: highRisk,
+    }
     res.status(200).json(response)
   }),
 )

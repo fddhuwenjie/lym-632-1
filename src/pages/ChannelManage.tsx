@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Eye, X, CheckCircle, XCircle, Calendar } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, X, CheckCircle, XCircle, Calendar, Activity, AlertTriangle, Shield, User, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
-import type { Channel } from '../../shared/types';
+import type { Channel, ChannelHealth } from '../../shared/types';
 
 const mockChannels: (Channel & { today_count: number })[] = [
   { id: 1, name: '微信公众号', type: 'wechat', status: 'active', today_count: 3 },
@@ -10,6 +10,14 @@ const mockChannels: (Channel & { today_count: number })[] = [
   { id: 4, name: '小红书', type: 'xiaohongshu', status: 'active', today_count: 1 },
   { id: 5, name: 'B站', type: 'bilibili', status: 'inactive', today_count: 0 },
 ];
+
+const mockChannelHealth: Record<number, ChannelHealth> = {
+  1: { id: 1, channel_id: 1, success_rate: 0.95, last_failure_reason: null, rate_limit_status: 'normal', responsible_person: '张三', updated_at: '2024-01-15' },
+  2: { id: 2, channel_id: 2, success_rate: 0.72, last_failure_reason: '接口超时', rate_limit_status: 'limited', responsible_person: '李四', updated_at: '2024-01-15' },
+  3: { id: 3, channel_id: 3, success_rate: 0.35, last_failure_reason: 'API密钥过期', rate_limit_status: 'blocked', responsible_person: '王五', updated_at: '2024-01-15' },
+  4: { id: 4, channel_id: 4, success_rate: 0.88, last_failure_reason: null, rate_limit_status: 'normal', responsible_person: '赵六', updated_at: '2024-01-15' },
+  5: { id: 5, channel_id: 5, success_rate: 0.50, last_failure_reason: '渠道已停用', rate_limit_status: 'normal', responsible_person: null, updated_at: '2024-01-15' },
+};
 
 const channelTypes = [
   { value: 'wechat', label: '微信公众号', color: 'bg-green-500' },
@@ -26,8 +34,13 @@ const getChannelTypeInfo = (type: string) => {
 
 export default function ChannelManage() {
   const [channels, setChannels] = useState(mockChannels);
+  const [channelHealthData, setChannelHealthData] = useState(mockChannelHealth);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showHealthModal, setShowHealthModal] = useState(false);
+  const [healthChannelId, setHealthChannelId] = useState<number | null>(null);
+  const [editingResponsible, setEditingResponsible] = useState(false);
+  const [responsibleInput, setResponsibleInput] = useState('');
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [name, setName] = useState('');
@@ -142,6 +155,44 @@ export default function ChannelManage() {
                   </div>
                   <span className="ml-auto text-xl font-bold text-[#1e3a5f]">{channel.today_count}</span>
                 </div>
+
+                {channelHealthData[channel.id] && (() => {
+                  const health = channelHealthData[channel.id];
+                  const healthColor = health.success_rate >= 0.8 ? 'text-green-600' : health.success_rate >= 0.5 ? 'text-yellow-600' : 'text-red-600';
+                  const rateLimitBadge = health.rate_limit_status === 'normal' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-700"><Shield className="w-3 h-3" />正常</span>
+                  ) : health.rate_limit_status === 'limited' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-yellow-100 text-yellow-700"><AlertTriangle className="w-3 h-3" />限流中</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-red-100 text-red-700"><XCircle className="w-3 h-3" />已阻断</span>
+                  );
+                  return (
+                    <div className="space-y-2 mb-4 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => { setHealthChannelId(channel.id); setShowHealthModal(true); }}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm text-gray-600">健康度</span>
+                        </div>
+                        <span className={cn('text-sm font-bold', healthColor)}>{(health.success_rate * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {rateLimitBadge}
+                        {health.responsible_person && (
+                          <span className="flex items-center gap-1 text-xs text-gray-500">
+                            <User className="w-3 h-3" />
+                            {health.responsible_person}
+                          </span>
+                        )}
+                      </div>
+                      {health.last_failure_reason && (
+                        <div className="flex items-center gap-1 text-xs text-red-500">
+                          <AlertTriangle className="w-3 h-3" />
+                          <span className="truncate">{health.last_failure_reason}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="flex items-center gap-2">
                   <span className={cn(
@@ -349,6 +400,132 @@ export default function ChannelManage() {
           </div>
         </div>
       )}
+
+      {showHealthModal && healthChannelId && (() => {
+        const healthChannel = channels.find(c => c.id === healthChannelId);
+        const health = channelHealthData[healthChannelId];
+        if (!healthChannel || !health) return null;
+        const healthColor = health.success_rate >= 0.8 ? 'text-green-600' : health.success_rate >= 0.5 ? 'text-yellow-600' : 'text-red-600';
+        const barColor = health.success_rate >= 0.8 ? 'bg-green-500' : health.success_rate >= 0.5 ? 'bg-yellow-500' : 'bg-red-500';
+        const rateLimitBadge = health.rate_limit_status === 'normal' ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700"><Shield className="w-3.5 h-3.5" />正常</span>
+        ) : health.rate_limit_status === 'limited' ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-700"><AlertTriangle className="w-3.5 h-3.5" />限流中</span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700"><XCircle className="w-3.5 h-3.5" />已阻断</span>
+        );
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl w-full max-w-md p-6 animate-scale-in">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">渠道健康度</h3>
+                <button onClick={() => { setShowHealthModal(false); setEditingResponsible(false); }} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className={cn('w-14 h-14 rounded-xl flex items-center justify-center', getChannelTypeInfo(healthChannel.type).color)}>
+                    <span className="text-white font-bold text-xl">{healthChannel.name.charAt(0)}</span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 text-lg">{healthChannel.name}</h4>
+                    <p className="text-sm text-gray-500">{getChannelTypeInfo(healthChannel.type).label}</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700">成功率</span>
+                    </div>
+                    <span className={cn('text-lg font-bold', healthColor)}>{(health.success_rate * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className={cn('h-2.5 rounded-full transition-all', barColor)} style={{ width: `${health.success_rate * 100}%` }} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-2">限流状态</p>
+                    {rateLimitBadge}
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-2">负责人</p>
+                    {editingResponsible ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={responsibleInput}
+                          onChange={(e) => setResponsibleInput(e.target.value)}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] outline-none"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => {
+                            setChannelHealthData({ ...channelHealthData, [healthChannelId]: { ...health, responsible_person: responsibleInput || null } });
+                            setEditingResponsible(false);
+                          }}
+                          className="text-xs text-[#1e3a5f] font-medium hover:underline"
+                        >
+                          保存
+                        </button>
+                      </div>
+                    ) : (
+                      <span
+                        className="flex items-center gap-1 text-sm text-gray-700 cursor-pointer hover:text-[#1e3a5f]"
+                        onClick={() => { setEditingResponsible(true); setResponsibleInput(health.responsible_person || ''); }}
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        {health.responsible_person || '未设置'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {health.last_failure_reason && (
+                  <div className="p-4 bg-red-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <span className="text-sm font-medium text-red-700">最近失败原因</span>
+                    </div>
+                    <p className="text-sm text-red-600 ml-6">{health.last_failure_reason}</p>
+                  </div>
+                )}
+
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">更新时间</p>
+                  <p className="text-sm text-gray-700 mt-1">{health.updated_at}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 mt-8">
+                <button
+                  onClick={() => {
+                    setChannelHealthData({
+                      ...channelHealthData,
+                      [healthChannelId]: { ...health, success_rate: Math.min(1, Math.max(0, health.success_rate + (Math.random() - 0.5) * 0.1)), updated_at: new Date().toISOString().split('T')[0] }
+                    });
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors inline-flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  刷新健康度
+                </button>
+                <button
+                  onClick={() => { setShowHealthModal(false); setEditingResponsible(false); }}
+                  className="flex-1 py-2.5 px-4 rounded-lg font-medium bg-[#1e3a5f] text-white hover:bg-[#2d4a6f] transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <style>{`
         @keyframes scale-in {

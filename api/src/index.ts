@@ -17,6 +17,7 @@ import sensitiveRoutes from './routes/sensitive.js'
 import channelRoutes from './routes/channel.js'
 import exportRoutes from './routes/export.js'
 import publishRoutes from './routes/publish.js'
+import failureReviewRouter from './routes/failureReview.js'
 import type { ApiResponse } from '../../shared/types.js'
 
 dotenv.config()
@@ -49,6 +50,7 @@ app.use('/api/sensitive', sensitiveRoutes)
 app.use('/api/channels', channelRoutes)
 app.use('/api/export', exportRoutes)
 app.use('/api/publish', publishRoutes)
+app.use('/api/failure-reviews', failureReviewRouter)
 
 app.use(errorHandler)
 app.use(notFoundHandler)

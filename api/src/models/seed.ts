@@ -67,6 +67,9 @@ export function seedData(): void {
   const insertSensitiveWord = db.prepare(
     'INSERT OR IGNORE INTO sensitive_words (word, category, version, is_active) VALUES (?, ?, ?, ?)'
   );
+  const insertChannelHealth = db.prepare(
+    'INSERT OR IGNORE INTO channel_health (channel_id, success_rate, rate_limit_status, responsible_person, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)'
+  );
 
   const transaction = db.transaction(() => {
     for (const user of users) {
@@ -80,6 +83,11 @@ export function seedData(): void {
 
     for (const word of sensitiveWords) {
       insertSensitiveWord.run(word.word, word.category, word.version, word.is_active ? 1 : 0);
+    }
+
+    const channelRows = db.prepare('SELECT id FROM channels').all() as { id: number }[];
+    for (const row of channelRows) {
+      insertChannelHealth.run(row.id, 1.0, 'normal', null);
     }
   });
 

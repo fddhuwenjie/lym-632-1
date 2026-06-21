@@ -1,5 +1,5 @@
 import { get, post, put, del } from '../utils/request';
-import type { Channel } from '../types';
+import type { Channel, ChannelHealth, ScheduleRiskWarning } from '../types';
 
 export const getChannelList = (): Promise<Channel[]> => {
   return get<Channel[]>('/channel');
@@ -28,4 +28,29 @@ export const updateChannel = (id: number, data: Partial<Channel>): Promise<Chann
 
 export const deleteChannel = (id: number): Promise<void> => {
   return del<void>(`/channel/${id}`);
+};
+
+export const getChannelHealthList = (): Promise<ChannelHealth[]> => {
+  return get<ChannelHealth[]>('/channel/health');
+};
+
+export const getChannelHealth = (channelId: number): Promise<ChannelHealth> => {
+  return get<ChannelHealth>(`/channel/${channelId}/health`);
+};
+
+export const updateChannelHealth = (channelId: number, data: {
+  success_rate?: number;
+  last_failure_reason?: string;
+  rate_limit_status?: string;
+  responsible_person?: string;
+}): Promise<ChannelHealth> => {
+  return put<ChannelHealth>(`/channel/${channelId}/health`, data);
+};
+
+export const refreshChannelHealth = (channelId: number): Promise<ChannelHealth> => {
+  return post<ChannelHealth>(`/channel/${channelId}/health/refresh`);
+};
+
+export const getHighRiskChannels = (): Promise<ScheduleRiskWarning[]> => {
+  return get<ScheduleRiskWarning[]>('/channel/risk/high');
 };

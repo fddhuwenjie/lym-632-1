@@ -15,6 +15,7 @@ import type {
   PaginationResult,
   ApiResponse,
   ScheduleStatus,
+  ScheduleRiskWarning,
 } from '../../../shared/types.js'
 
 const router = Router()
@@ -155,23 +156,42 @@ router.post(
       throw createError(duplicateCheck.error!, 400)
     }
 
-    const schedule = await ScheduleModel.create({
+    const { schedule, risk_warning } = await ScheduleService.createScheduleWithRisk(
       content_id,
-      channel_id,
-      schedule_time,
-      status: 'scheduled',
-    })
+      {
+        channel_id,
+        schedule_time,
+        status: 'scheduled',
+      },
+    )
 
     await ContentModel.updateStatus(content_id, 'scheduled')
 
     await schedulePublishTask(schedule.id, schedule.schedule_time)
 
-    const response: ApiResponse<Schedule> = {
+    const response: ApiResponse<{ schedule: Schedule; risk_warning?: ScheduleRiskWarning }> = {
       success: true,
-      data: schedule,
+      data: { schedule, risk_warning },
     }
 
     res.status(201).json(response)
+  }),
+)
+
+router.get(
+  '/risk/:channelId',
+  requireRole('editor', 'reviewer', 'admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const channelId = parseInt(req.params.channelId, 10)
+    if (isNaN(channelId)) {
+      throw createError('无效的渠道ID', 400)
+    }
+    const riskWarning = await ScheduleService.assessScheduleRisk(channelId)
+    const response: ApiResponse<typeof riskWarning> = {
+      success: true,
+      data: riskWarning,
+    }
+    res.status(200).json(response)
   }),
 )
 

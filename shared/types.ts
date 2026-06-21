@@ -17,12 +17,31 @@ export interface User {
   created_at: string;
 }
 
+export type RateLimitStatus = 'normal' | 'limited' | 'blocked';
+
+export type FailureReviewStatus = 'pending' | 'resolved';
+
+export type FailureReviewAction = 'republish' | 'manual_publish';
+
+export type ReviewAuditAction = 'create' | 'override';
+
 export interface Channel {
   id: number;
   name: string;
   type: string;
   status: 'active' | 'inactive';
   config?: string;
+}
+
+export interface ChannelHealth {
+  id: number;
+  channel_id: number;
+  success_rate: number;
+  last_failure_reason: string | null;
+  rate_limit_status: RateLimitStatus;
+  responsible_person: string | null;
+  updated_at: string;
+  channel?: Channel;
 }
 
 export interface SensitiveWord {
@@ -76,8 +95,43 @@ export interface ReviewRecord {
   reviewer_id: number;
   decision: ReviewDecision;
   opinion: string;
+  opinion_version: number;
   created_at: string;
   reviewer?: User;
+}
+
+export interface ReviewAuditTrail {
+  id: number;
+  review_record_id: number;
+  operator_id: number;
+  action: ReviewAuditAction;
+  previous_decision: ReviewDecision | null;
+  new_decision: ReviewDecision;
+  opinion: string;
+  opinion_version: number;
+  created_at: string;
+  operator?: User;
+}
+
+export interface FailureReview {
+  id: number;
+  publish_record_id: number;
+  schedule_id: number;
+  handler_id: number | null;
+  conclusion: string | null;
+  action_type: FailureReviewAction | null;
+  status: FailureReviewStatus;
+  created_at: string;
+  resolved_at: string | null;
+  handler?: User;
+  publish_record?: PublishRecord;
+}
+
+export interface ScheduleRiskWarning {
+  channel_id: number;
+  channel_name: string;
+  risk_level: 'low' | 'medium' | 'high';
+  reasons: string[];
 }
 
 export interface PublishRecord {
@@ -154,4 +208,11 @@ export interface DashboardStats {
   today_schedule_count: number;
   sensitive_hit_count: number;
   publish_success_rate: number;
+  high_risk_channel_count: number;
+  pending_failure_review_count: number;
+}
+
+export interface ScheduleWithRiskWarning {
+  schedule: Schedule;
+  risk_warnings: ScheduleRiskWarning[];
 }

@@ -1,10 +1,13 @@
 import db, { transaction } from '../db/index.js'
 import { createError } from '../types/index.js'
 import ReviewRecordModel from '../models/ReviewRecord.js'
+import ReviewAuditTrailModel from '../models/ReviewAuditTrail.js'
 import ContentModel from '../models/Content.js'
 import { validateReviewOpinion } from '../utils/validator.js'
 import type {
   ReviewRecord,
+  ReviewAuditTrail,
+  ReviewAuditAction,
   Content,
   PaginationParams,
   PaginationResult,
@@ -76,6 +79,16 @@ export async function approveContent(
       opinion: opinion || '',
     })
 
+    await ReviewAuditTrailModel.create({
+      review_record_id: reviewRecord.id,
+      operator_id: reviewerId,
+      action: 'create',
+      previous_decision: null,
+      new_decision: 'approve',
+      opinion: opinion || '',
+      opinion_version: 1,
+    })
+
     await ContentModel.update(contentId, {
       status: 'review_approved',
     })
@@ -134,6 +147,16 @@ export async function rejectContent(
       opinion,
     })
 
+    await ReviewAuditTrailModel.create({
+      review_record_id: reviewRecord.id,
+      operator_id: reviewerId,
+      action: 'create',
+      previous_decision: null,
+      new_decision: 'reject',
+      opinion,
+      opinion_version: 1,
+    })
+
     await ContentModel.update(contentId, {
       status: 'review_rejected',
     })
@@ -179,10 +202,87 @@ export async function getReviewerRecords(
   return ReviewRecordModel.findByReviewerId(reviewerId, params)
 }
 
+export async function overrideReview(
+  contentId: number,
+  operatorId: number,
+  newDecision: 'approve' | 'reject',
+  opinion: string,
+): Promise<ReviewRecord> {
+  const content = await ContentModel.findById(contentId)
+
+  if (!content) {
+    throw createError('内容不存在', 404, 'CONTENT_NOT_FOUND')
+  }
+
+  if (content.status !== 'review_approved' && content.status !== 'review_rejected') {
+    throw createError('内容状态不允许覆核', 400, 'INVALID_STATUS')
+  }
+
+  const latestRecord = await ReviewRecordModel.getLatestByContentId(contentId)
+
+  if (!latestRecord) {
+    throw createError('未找到复核记录', 404, 'REVIEW_RECORD_NOT_FOUND')
+  }
+
+  const previousDecision = latestRecord.decision
+  const newVersion = latestRecord.opinion_version + 1
+
+  return transaction(async (tx) => {
+    const newReviewRecord = await ReviewRecordModel.create({
+      content_id: contentId,
+      reviewer_id: operatorId,
+      decision: newDecision,
+      opinion,
+      opinion_version: newVersion,
+    })
+
+    await ReviewAuditTrailModel.create({
+      review_record_id: newReviewRecord.id,
+      operator_id: operatorId,
+      action: 'override',
+      previous_decision: previousDecision,
+      new_decision: newDecision,
+      opinion,
+      opinion_version: newVersion,
+    })
+
+    await ContentModel.update(contentId, {
+      status: newDecision === 'approve' ? 'review_approved' : 'review_rejected',
+    })
+
+    if (newDecision === 'approve') {
+      const scheduleStmt = tx.prepare(`
+        UPDATE schedules
+        SET status = 'scheduled'
+        WHERE content_id = ? AND status = 'pending'
+      `)
+      scheduleStmt.run(contentId)
+    } else {
+      const scheduleStmt = tx.prepare(`
+        UPDATE schedules
+        SET status = 'rejected'
+        WHERE content_id = ? AND status IN ('pending', 'scheduled')
+      `)
+      scheduleStmt.run(contentId)
+    }
+
+    return newReviewRecord
+  })
+}
+
+export async function getReviewAuditTrail(
+  contentId: number,
+  params?: PaginationParams,
+): Promise<PaginationResult<ReviewAuditTrail>> {
+  return ReviewAuditTrailModel.findByContentId(contentId, params)
+}
+
 export default {
   getReviewQueue,
   approveContent,
   rejectContent,
   getReviewRecords,
   getReviewerRecords,
+  overrideReview,
+  getReviewAuditTrail,
 }

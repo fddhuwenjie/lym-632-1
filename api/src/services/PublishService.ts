@@ -4,6 +4,8 @@ import PublishRecordModel from '../models/PublishRecord.js'
 import ScheduleModel from '../models/Schedule.js'
 import ContentModel from '../models/Content.js'
 import ChannelModel from '../models/Channel.js'
+import ChannelHealthModel from '../models/ChannelHealth.js'
+import FailureReviewModel from '../models/FailureReview.js'
 import type {
   PublishRecord,
   Content,
@@ -11,6 +13,9 @@ import type {
   PaginationParams,
   PaginationResult,
   PublishStatus,
+  FailureReview,
+  FailureReviewStatus,
+  FailureReviewAction,
 } from '../../../shared/types.js'
 
 export async function executePublish(
@@ -92,6 +97,16 @@ export async function executePublish(
 
       await ContentModel.update(schedule.content_id, {
         status: 'published',
+      })
+
+      await ChannelHealthModel.recalculate(channel.id)
+    }
+
+    if (status === 'failed') {
+      await ChannelHealthModel.recalculate(channel.id)
+      await FailureReviewModel.create({
+        publish_record_id: publishRecord.id,
+        schedule_id: scheduleId,
       })
     }
 
@@ -202,13 +217,13 @@ export async function retryPublish(
   scheduleId: number,
 ): Promise<PublishRecord> {
   const schedule = await ScheduleModel.findById(scheduleId)
-  
+
   if (!schedule) {
     throw createError('排期不存在', 404, 'SCHEDULE_NOT_FOUND')
   }
 
   const latestRecord = await PublishRecordModel.getLatestByScheduleId(scheduleId)
-  
+
   if (!latestRecord) {
     return executePublish(scheduleId)
   }
@@ -217,7 +232,103 @@ export async function retryPublish(
     throw createError('该排期已发布成功，无需重试', 400, 'ALREADY_SUCCESS')
   }
 
-  return executePublish(scheduleId)
+  const content = await ContentModel.findById(schedule.content_id)
+  if (!content) {
+    throw createError('内容不存在', 404, 'CONTENT_NOT_FOUND')
+  }
+
+  const channel = await ChannelModel.findById(schedule.channel_id)
+  if (!channel) {
+    throw createError('渠道不存在', 404, 'CHANNEL_NOT_FOUND')
+  }
+
+  if (channel.status !== 'active') {
+    throw createError('渠道未激活', 400, 'CHANNEL_INACTIVE')
+  }
+
+  return transaction(async () => {
+    const publishTime = new Date().toISOString()
+    const publishResult = await simulatePublish(content, channel)
+
+    let status: PublishStatus = 'success'
+    let resultMessage = '发布成功'
+
+    if (!publishResult.success) {
+      status = 'failed'
+      resultMessage = publishResult.error || '发布失败'
+    }
+
+    const updated = await PublishRecordModel.update(latestRecord.id, {
+      status,
+      result: resultMessage,
+      publish_time: publishTime,
+    })
+
+    if (!updated) {
+      throw createError('更新发布记录失败', 500, 'UPDATE_FAILED')
+    }
+
+    const publishRecord = updated
+
+    if (status === 'success') {
+      await ScheduleModel.update(scheduleId, {
+        status: 'published',
+      })
+
+      await ContentModel.update(schedule.content_id, {
+        status: 'published',
+      })
+
+      await ChannelHealthModel.recalculate(channel.id)
+    }
+
+    if (status === 'failed') {
+      await ChannelHealthModel.recalculate(channel.id)
+      await FailureReviewModel.create({
+        publish_record_id: publishRecord.id,
+        schedule_id: scheduleId,
+      })
+    }
+
+    return publishRecord
+  })
+}
+
+export async function getFailureReviews(
+  params?: PaginationParams,
+): Promise<PaginationResult<FailureReview>> {
+  return FailureReviewModel.findAll(params)
+}
+
+export async function getFailureReviewsByStatus(
+  status: FailureReviewStatus,
+  params?: PaginationParams,
+): Promise<PaginationResult<FailureReview>> {
+  return FailureReviewModel.findByStatus(status, params)
+}
+
+export async function resolveFailureReview(
+  reviewId: number,
+  handlerId: number,
+  conclusion: string,
+  actionType: FailureReviewAction,
+): Promise<FailureReview | null> {
+  const resolved = await FailureReviewModel.resolve(reviewId, handlerId, conclusion, actionType)
+
+  if (!resolved) {
+    throw createError('失败复核不存在', 404, 'FAILURE_REVIEW_NOT_FOUND')
+  }
+
+  if (actionType === 'republish') {
+    const scheduleId = resolved.schedule_id
+    const schedule = await ScheduleModel.findById(scheduleId)
+
+    if (schedule && (schedule.status === 'failed' || schedule.status === 'scheduled' || schedule.status === 'approved')) {
+      await retryPublish(scheduleId)
+    }
+  }
+
+  return resolved
 }
 
 export default {
@@ -226,4 +337,7 @@ export default {
   getPublishRecordDetail,
   getPublishStats,
   retryPublish,
+  getFailureReviews,
+  getFailureReviewsByStatus,
+  resolveFailureReview,
 }

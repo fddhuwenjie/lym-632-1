@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Eye, Check, X, FileText, Video, Image, AlertTriangle } from 'lucide-react';
+import { Eye, Check, X, FileText, Video, Image, AlertTriangle, RotateCcw, Clock, User } from 'lucide-react';
 import { cn } from '../lib/utils';
-import type { Content, ContentType } from '../../shared/types';
+import type { Content, ContentType, ReviewAuditTrail } from '../../shared/types';
 
 const mockPendingContents: Content[] = [
   { id: 1, title: '2024年度产品发布会预告', type: 'article', status: 'pending_review', created_at: '2024-01-15 10:30', creator_id: 1, content: '', scan_version: 1, updated_at: '2024-01-15 10:30' },
@@ -13,6 +13,20 @@ const mockPendingContents: Content[] = [
 
 const sensitiveHitCounts: Record<number, number> = {
   1: 2, 2: 0, 3: 1, 4: 3, 5: 0,
+};
+
+const mockAuditTrails: Record<number, ReviewAuditTrail[]> = {
+  1: [
+    { id: 1, review_record_id: 1, operator_id: 2, action: 'create', previous_decision: null, new_decision: 'approve', opinion: '内容合规', opinion_version: 1, created_at: '2024-01-15 10:30' },
+  ],
+  4: [
+    { id: 2, review_record_id: 2, operator_id: 2, action: 'create', previous_decision: null, new_decision: 'reject', opinion: '存在敏感词', opinion_version: 1, created_at: '2024-01-14 14:20' },
+    { id: 3, review_record_id: 3, operator_id: 3, action: 'override', previous_decision: 'reject', new_decision: 'approve', opinion: '已修改，重新审核通过', opinion_version: 2, created_at: '2024-01-14 16:00' },
+  ],
+};
+
+const contentVersions: Record<number, number> = {
+  1: 1, 4: 2,
 };
 
 const typeIcons: Record<ContentType, typeof FileText> = {
@@ -40,6 +54,9 @@ export default function ReviewQueue() {
   const [opinion, setOpinion] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrideDecision, setOverrideDecision] = useState<'approve' | 'reject'>('approve');
+  const [overrideOpinion, setOverrideOpinion] = useState('');
 
   const handleOpenReview = (content: Content, type: 'approve' | 'reject') => {
     setSelectedContent(content);
@@ -82,6 +99,7 @@ export default function ReviewQueue() {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">类型</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">敏感词命中</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">提交时间</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">版本</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">操作</th>
                 </tr>
               </thead>
@@ -110,6 +128,11 @@ export default function ReviewQueue() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-500 text-sm hidden md:table-cell">{item.created_at}</td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-600">
+                          {contentVersions[item.id] ? `v${contentVersions[item.id]}` : '-'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -140,7 +163,7 @@ export default function ReviewQueue() {
                 })}
                 {mockPendingContents.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                       <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
                       <p>暂无待复核内容</p>
                     </td>
@@ -231,8 +254,66 @@ export default function ReviewQueue() {
                   敏感词命中：{sensitiveHitCounts[selectedContent.id] || 0} 次
                 </span>
               </div>
+
+              {mockAuditTrails[selectedContent.id] && mockAuditTrails[selectedContent.id].length > 0 && (
+                <div className="mt-6">
+                  <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    审核轨迹
+                  </h5>
+                  <div className="space-y-3">
+                    {mockAuditTrails[selectedContent.id].map((trail) => (
+                      <div key={trail.id} className="flex gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className={cn(
+                            'w-3 h-3 rounded-full mt-1',
+                            trail.action === 'create' ? 'bg-blue-500' : 'bg-orange-500'
+                          )} />
+                          <div className="w-px flex-1 bg-gray-200 mt-1" />
+                        </div>
+                        <div className="pb-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={cn(
+                              'px-2 py-0.5 rounded text-xs font-medium',
+                              trail.action === 'create' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                            )}>
+                              {trail.action === 'create' ? '创建' : '改判'}
+                            </span>
+                            <span className="text-xs text-gray-400">{trail.created_at}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                            <User className="w-3.5 h-3.5" />
+                            <span>操作人 #{trail.operator_id}</span>
+                          </div>
+                          {trail.action === 'override' && trail.previous_decision && (
+                            <p className="text-xs text-gray-500 mb-1">
+                              决定变更：{trail.previous_decision === 'approve' ? '通过' : '驳回'} → {trail.new_decision === 'approve' ? '通过' : '驳回'}
+                            </p>
+                          )}
+                          <p className="text-sm text-gray-700">{trail.opinion}</p>
+                          <p className="text-xs text-gray-400 mt-1">v{trail.opinion_version}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex gap-4 p-6 border-t border-gray-200">
+              {contentVersions[selectedContent.id] && (
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    setOverrideDecision('approve');
+                    setOverrideOpinion('');
+                    setShowOverrideModal(true);
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-orange-300 text-orange-700 hover:bg-orange-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  改判
+                </button>
+              )}
               <button
                 onClick={() => { setShowDetailModal(false); handleOpenReview(selectedContent, 'reject'); }}
                 className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-red-300 text-red-700 hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
@@ -246,6 +327,71 @@ export default function ReviewQueue() {
               >
                 <Check className="w-4 h-4" />
                 通过
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOverrideModal && selectedContent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 animate-scale-in">
+            <h3 className="text-lg font-semibold text-orange-700 mb-2 flex items-center gap-2">
+              <RotateCcw className="w-5 h-5" />
+              改判审核
+            </h3>
+            <p className="text-gray-500 text-sm mb-6">
+              改判内容：<span className="font-medium text-gray-700">{selectedContent.title}</span>
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">新决定</label>
+              <select
+                value={overrideDecision}
+                onChange={(e) => setOverrideDecision(e.target.value as 'approve' | 'reject')}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none"
+              >
+                <option value="approve">通过</option>
+                <option value="reject">驳回</option>
+              </select>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                改判意见 <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={overrideOpinion}
+                onChange={(e) => setOverrideOpinion(e.target.value)}
+                placeholder="请输入改判原因..."
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none resize-none"
+              />
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowOverrideModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={async () => {
+                  if (!overrideOpinion.trim()) {
+                    alert('改判意见不能为空');
+                    return;
+                  }
+                  setSubmitting(true);
+                  await new Promise(resolve => setTimeout(resolve, 800));
+                  setSubmitting(false);
+                  setShowOverrideModal(false);
+                  alert(`已改判为${overrideDecision === 'approve' ? '通过' : '驳回'}：${selectedContent.title}`);
+                }}
+                disabled={submitting || !overrideOpinion.trim()}
+                className="flex-1 py-2.5 px-4 rounded-lg font-medium text-white bg-orange-600 hover:bg-orange-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? '提交中...' : '确认改判'}
               </button>
             </div>
           </div>

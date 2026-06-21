@@ -11,6 +11,7 @@ import type {
   Content,
   ReviewRecord,
   ReviewRequest,
+  ReviewAuditTrail,
   PaginationParams,
   PaginationResult,
   ApiResponse,
@@ -148,6 +149,43 @@ router.post(
       data: reviewRecord,
     }
 
+    res.status(200).json(response)
+  }),
+)
+
+router.post(
+  '/:id/override',
+  requireRole('admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw createError('用户未登录', 401)
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw createError('无效的内容ID', 400)
+    const { decision, opinion } = req.body as { decision: 'approve' | 'reject'; opinion: string }
+    if (!decision || !['approve', 'reject'].includes(decision)) throw createError('决策无效', 400)
+    if (!opinion || opinion.trim().length === 0) throw createError('改判意见不能为空', 400)
+    const ReviewService = (await import('../services/ReviewService.js')).default
+    const result = await ReviewService.overrideReview(id, req.user.id, decision, opinion)
+    const response: ApiResponse<typeof result> = {
+      success: true,
+      data: result,
+    }
+    res.status(200).json(response)
+  }),
+)
+
+router.get(
+  '/:id/audit-trail',
+  requireRole('reviewer', 'admin'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) throw createError('无效的内容ID', 400)
+    const { page, pageSize } = req.query as PaginationParams
+    const ReviewService = (await import('../services/ReviewService.js')).default
+    const result = await ReviewService.getReviewAuditTrail(id, { page, pageSize })
+    const response: ApiResponse<typeof result> = {
+      success: true,
+      data: result,
+    }
     res.status(200).json(response)
   }),
 )

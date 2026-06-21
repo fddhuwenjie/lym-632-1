@@ -3,6 +3,7 @@ import { createError } from '../types/index.js'
 import ScheduleModel from '../models/Schedule.js'
 import ContentModel from '../models/Content.js'
 import ChannelModel from '../models/Channel.js'
+import ChannelService from './ChannelService.js'
 import {
   validateScheduleTime,
   validateDuplicateSchedule,
@@ -13,12 +14,17 @@ import type {
   PaginationParams,
   PaginationResult,
   UpdateScheduleRequest,
+  ScheduleRiskWarning,
 } from '../../../shared/types.js'
 
-export async function createSchedule(
+export async function assessScheduleRisk(channelId: number): Promise<ScheduleRiskWarning> {
+  return ChannelService.assessChannelRisk(channelId)
+}
+
+export async function createScheduleWithRisk(
   contentId: number,
   data: { channel_id: number; schedule_time: string; status?: ScheduleStatus },
-): Promise<Schedule> {
+): Promise<{ schedule: Schedule; risk_warning?: ScheduleRiskWarning }> {
   const content = await ContentModel.findById(contentId)
   if (!content) {
     throw createError('内容不存在', 404, 'CONTENT_NOT_FOUND')
@@ -33,6 +39,8 @@ export async function createSchedule(
     throw createError('渠道未激活', 400, 'CHANNEL_INACTIVE')
   }
 
+  const riskWarning = await ChannelService.assessChannelRisk(data.channel_id)
+
   const scheduleTimeValid = await validateScheduleTime(data.schedule_time)
   if (!scheduleTimeValid.valid) {
     throw createError(scheduleTimeValid.error!, 400, 'INVALID_SCHEDULE_TIME')
@@ -46,12 +54,26 @@ export async function createSchedule(
     throw createError(duplicateValid.error!, 400, 'DUPLICATE_SCHEDULE')
   }
 
-  return ScheduleModel.create({
+  const schedule = await ScheduleModel.create({
     content_id: contentId,
     channel_id: data.channel_id,
     schedule_time: data.schedule_time,
     status: data.status || 'pending',
   })
+
+  if (riskWarning.risk_level === 'high') {
+    return { schedule, risk_warning: riskWarning }
+  }
+
+  return { schedule }
+}
+
+export async function createSchedule(
+  contentId: number,
+  data: { channel_id: number; schedule_time: string; status?: ScheduleStatus },
+): Promise<Schedule> {
+  const result = await createScheduleWithRisk(contentId, data)
+  return result.schedule
 }
 
 export async function updateSchedule(
@@ -213,6 +235,8 @@ export async function getScheduleDetail(scheduleId: number): Promise<Schedule> {
 
 export default {
   createSchedule,
+  createScheduleWithRisk,
+  assessScheduleRisk,
   updateSchedule,
   withdrawSchedule,
   getScheduleList,
