@@ -1,13 +1,57 @@
-# 内容发布排期与敏感词复核系统
+# React + TypeScript + Vite
 
-任务类型：0-1代码生成
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-业务领域：全栈Web应用
+Currently, two official plugins are available:
 
-修改范围：跨模块多文件
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-任务难度：中等偏难
+## Expanding the ESLint configuration
 
-题面：
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-做一个内容发布排期与敏感词复核系统，编辑创建文章、短视频或海报内容后选择发布渠道和排期时间，系统执行敏感词扫描并进入复核队列。正常内容要能通过初审、定时发布、撤回、重新排期和查看渠道状态，每次复核要记录处理人和意见。敏感词未处理、排期早于当前时间、同一渠道重复排期、已发布内容被直接删除、复核意见缺失时都要拒绝。系统需要内容日历、风险词命中明细、待复核队列和发布记录导出，导出包含渠道、排期、发布状态和撤回原因。重启后草稿、复核状态、排期任务和导出记录保持一致。验收还要覆盖敏感词库更新后只影响新扫描内容。
+```js
+export default tseslint.config({
+  extends: [
+    // Remove ...tseslint.configs.recommended and replace with this
+    ...tseslint.configs.recommendedTypeChecked,
+    // Alternatively, use this for stricter rules
+    ...tseslint.configs.strictTypeChecked,
+    // Optionally, add this for stylistic rules
+    ...tseslint.configs.stylisticTypeChecked,
+  ],
+  languageOptions: {
+    // other options...
+    parserOptions: {
+      project: ['./tsconfig.node.json', './tsconfig.app.json'],
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+})
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default tseslint.config({
+  extends: [
+    // other configs...
+    // Enable lint rules for React
+    reactX.configs['recommended-typescript'],
+    // Enable lint rules for React DOM
+    reactDom.configs.recommended,
+  ],
+  languageOptions: {
+    // other options...
+    parserOptions: {
+      project: ['./tsconfig.node.json', './tsconfig.app.json'],
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+})
+```
